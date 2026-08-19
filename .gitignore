@@ -1,0 +1,19 @@
+# 실제 고객/영업 데이터가 담긴 원본 CSV 및 생성된 대시보드는 커밋하지 않습니다.
+*.csv
+청약현황_대시보드*.html
+dashboard*.html
+
+# Python
+__pycache__/
+*.pyc
+
+# 생성기 로컬 상태 (사용자별 마지막 경로, 오류 로그)
+대시보드생성기/config.json
+대시보드생성기/error.log
+대시보드생성기/dist/
+대시보드생성기/build/
+대시보드생성기/*.spec
+
+# OS
+.DS_Store
+Thumbs.db
