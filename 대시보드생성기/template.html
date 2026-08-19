@@ -1209,6 +1209,8 @@
     var missing = REQUIRED_COLS.filter(function (col) { return idx[col] === -1; });
     if (missing.length) throw new Error("필수 컬럼이 없습니다: " + missing.join(", "));
     var referrerIdx = header.indexOf("추천자명");
+    var hqIdx = header.indexOf("영업본부명");
+    if (hqIdx === -1) hqIdx = header.indexOf("관리본부명");
     var records = [], skipped = 0;
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i];
@@ -1227,7 +1229,8 @@
         (r[idx["계약번호"]] || "").trim(),
         (r[idx["상호"]] || "").trim(),
         fee,
-        referrerIdx >= 0 ? (r[referrerIdx] || "").trim() : ""
+        referrerIdx >= 0 ? (r[referrerIdx] || "").trim() : "",
+        hqIdx >= 0 ? (r[hqIdx] || "").trim() : ""
       ]);
     }
     return { records: records, skipped: skipped };
@@ -1242,6 +1245,7 @@
         if (result.records.length === 0) throw new Error("유효한 데이터 행을 찾지 못했습니다.");
         loadData({ records: result.records });
         resetAllFilters();
+        renderHqChipsShell();
         renderBranchChipsShell();
         populateDateSelects();
         document.getElementById("file-name").textContent =
