@@ -2436,11 +2436,11 @@
 
     [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
       var y = H - f * H;
-      svg.appendChild(svgEl("line", { x1: 0, x2: W, y1: y, y2: y, stroke: "var(--grid-line)", "stroke-width": 1 }));
+      svg.appendChild(svgEl("line", { x1: 0, x2: W, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1, "stroke-dasharray": "4,4", opacity: "0.6" }));
     });
     if (hasProjection) {
       var splitX = xAt(months.length - 1);
-      svg.appendChild(svgEl("line", { x1: splitX, x2: splitX, y1: 0, y2: H, stroke: "var(--grid-line)", "stroke-width": 1, "stroke-dasharray": "3,3" }));
+      svg.appendChild(svgEl("line", { x1: splitX, x2: splitX, y1: 0, y2: H, stroke: "var(--text-muted)", "stroke-width": 1.5, "stroke-dasharray": "5,5", opacity: "0.8" }));
     }
 
     if (ciOn) {
@@ -2457,10 +2457,18 @@
       svg.appendChild(ciText);
     }
 
+    var defs = svgEl("defs");
+    var gradId = "grad-" + prefix + "-" + Math.floor(Math.random() * 10000);
+    var grad = svgEl("linearGradient", { id: gradId, x1: "0%", y1: "0%", x2: "0%", y2: "100%" });
+    grad.appendChild(svgEl("stop", { offset: "0%", "stop-color": colorVar, "stop-opacity": "0.45" }));
+    grad.appendChild(svgEl("stop", { offset: "100%", "stop-color": colorVar, "stop-opacity": "0.0" }));
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
     if (actualVals.length >= 2) {
       var pts = actualVals.map(function (v, i) { return xAt(i) + "," + yAt(v); });
       var poly = [xAt(0) + "," + H].concat(pts).concat([xAt(actualVals.length - 1) + "," + H]);
-      svg.appendChild(svgEl("polygon", { points: poly.join(" "), fill: colorVar, opacity: "0.10", stroke: "none" }));
+      svg.appendChild(svgEl("polygon", { points: poly.join(" "), fill: "url(#" + gradId + ")", stroke: "none" }));
     }
 
     var maOn = state.showMA && actualVals.length >= 3;
@@ -2475,7 +2483,7 @@
 
     var linePts = actualVals.map(function (v, i) { return xAt(i) + "," + yAt(v); }).join(" ");
     svg.appendChild(svgEl("polyline", {
-      points: linePts, fill: "none", stroke: colorVar, "stroke-width": 3,
+      points: linePts, fill: "none", stroke: colorVar, "stroke-width": 3.5,
       "stroke-linejoin": "round", "stroke-linecap": "round"
     }));
     var outliers = state.showOutliers ? detectOutliers(actualVals, completeCount, 1.5) : [];
@@ -2484,11 +2492,11 @@
     actualVals.forEach(function (v, i) {
       if (outlierIdx[i]) {
         svg.appendChild(svgEl("circle", {
-          cx: xAt(i), cy: yAt(v), r: 9, fill: "none", stroke: "var(--critical)", "stroke-width": 2, "stroke-dasharray": "2,2"
+          cx: xAt(i), cy: yAt(v), r: 10, fill: "none", stroke: "var(--critical)", "stroke-width": 2.5, "stroke-dasharray": "2,2"
         }));
       }
       svg.appendChild(svgEl("circle", {
-        cx: xAt(i), cy: yAt(v), r: 5, fill: colorVar, stroke: "var(--surface-1)", "stroke-width": 2
+        cx: xAt(i), cy: yAt(v), r: 5.5, fill: "var(--surface-1)", stroke: colorVar, "stroke-width": 2.5
       }));
     });
     if (projVals.length) {
@@ -2509,11 +2517,21 @@
       var li = actualVals.length - 1;
       var text = fmtMetric(actualVals[li], metric);
       var lx = xAt(li);
-      var above = yAt(actualVals[li]) - 18;
-      var ly = above - 10 < 4 ? yAt(actualVals[li]) + 22 : above;
-      var estWidth = text.length * 7.8 + 14;
-      svg.appendChild(svgEl("rect", { x: lx - estWidth / 2, y: ly - 11, width: estWidth, height: 21, rx: 4, fill: "var(--surface-1)" }));
-      var t = svgEl("text", { x: lx, y: ly + 4, "text-anchor": "middle", "font-size": 13, "font-weight": 650, fill: "var(--text-primary)" });
+      var above = yAt(actualVals[li]) - 22;
+      var ly = above - 12 < 4 ? yAt(actualVals[li]) + 26 : above;
+      var estWidth = text.length * 8.5 + 20;
+      
+      var filterId = "drop-shadow-" + prefix;
+      var filter = svgEl("filter", { id: filterId, x: "-20%", y: "-20%", width: "140%", height: "140%" });
+      filter.appendChild(svgEl("feDropShadow", { dx: 0, dy: 3, stdDeviation: 3, "flood-color": "#000", "flood-opacity": "0.3" }));
+      defs.appendChild(filter);
+
+      svg.appendChild(svgEl("rect", { 
+        x: lx - estWidth / 2, y: ly - 14, width: estWidth, height: 26, rx: 13, 
+        fill: "var(--surface-1)", stroke: "var(--border)", "stroke-width": 1,
+        filter: "url(#" + filterId + ")"
+      }));
+      var t = svgEl("text", { x: lx, y: ly + 5, "text-anchor": "middle", "font-size": 13.5, "font-weight": 700, fill: "var(--text-primary)" });
       t.textContent = text;
       svg.appendChild(t);
     }
