@@ -425,12 +425,18 @@ class DashboardApp:
 
             self._post(lambda: self._finish_success(output_path))
         except CsvFormatError as e:
-            self._post(lambda: self._finish_error("CSV 형식 오류", str(e)))
+            msg = str(e)
+            self._post(lambda: self._finish_error("CSV 형식 오류", msg))
         except FileNotFoundError as e:
-            self._post(lambda: self._finish_error("파일을 찾을 수 없음", str(e)))
+            msg = str(e)
+            self._post(lambda: self._finish_error("파일을 찾을 수 없음", msg))
         except Exception as e:
+            # 주의: except 블록을 벗어나면 파이썬이 'e'를 자동으로 해제하므로,
+            # 나중에 실행되는(after()로 예약된) 람다에서 e를 직접 참조하면 안 됩니다.
+            # 반드시 지금 이 시점에 문자열로 미리 뽑아 둡니다.
+            msg = str(e)
             tb = traceback.format_exc()
-            self._post(lambda: self._finish_error("예상치 못한 오류", str(e) + "\n\n" + tb))
+            self._post(lambda: self._finish_error("예상치 못한 오류", msg + "\n\n" + tb))
 
     def _post(self, fn):
         self.root.after(0, fn)
