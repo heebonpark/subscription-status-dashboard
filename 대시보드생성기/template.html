@@ -871,9 +871,22 @@
   }
 
   function computeBranchOrder(records) {
+    var order = ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주지사", "중앙지사", "강북지사", "서대문지사", "고양지사", "의정부지사", "남양주지사", "강릉지사"];
     var counts = {};
     records.forEach(function (r) { counts[r[0]] = (counts[r[0]] || 0) + 1; });
-    return Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    var keys = Object.keys(counts);
+    keys.sort(function(a, b) {
+      var aIdx = -1, bIdx = -1;
+      for (var i = 0; i < order.length; i++) {
+        if (a.indexOf(order[i]) !== -1 && aIdx === -1) aIdx = i;
+        if (b.indexOf(order[i]) !== -1 && bIdx === -1) bIdx = i;
+      }
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return counts[b] - counts[a];
+    });
+    return keys;
   }
   function computeDateList(records) {
     var s = {};

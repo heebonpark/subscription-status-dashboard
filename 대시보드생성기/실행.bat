@@ -6,10 +6,6 @@ setlocal
 cd /d "%~dp0"
 
 rem py / pyw(Python Launcher)를 최우선으로 사용합니다.
-rem "python"/"pythonw" 이름은 일부 PC에서 Microsoft Store 설치 안내로 연결되는
-rem 가짜 실행 파일(App Execution Alias)로 잡혀 있어 실행이 멈춘 것처럼 보일 수 있는데,
-rem py.exe/pyw.exe는 그런 문제가 없는 정식 Python 런처입니다.
-
 where pyw >nul 2>nul
 if %ERRORLEVEL%==0 (
     echo Python 실행기를 찾았습니다. 프로그램을 시작합니다...
@@ -50,6 +46,5 @@ exit /b 1
 
 :done
 echo 프로그램 창이 뜰 때까지 몇 초 정도 걸릴 수 있습니다.
-echo (백신 프로그램이 처음 실행되는 파일을 검사하면 더 걸릴 수 있습니다)
 timeout /t 3 >nul
 exit /b 0

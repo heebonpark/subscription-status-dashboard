@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 청약현황 대시보드 생성기
 CSV 실적 파일을 읽어 청약현황 대시보드(HTML) 파일을 자동으로 생성하는 GUI 프로그램입니다.
@@ -134,6 +134,12 @@ def _parse_with_encoding(path, encoding):
 
         idx = {c: header.index(c) for c in REQUIRED_COLS}
         ref_idx = header.index(OPTIONAL_REFERRER_COL) if OPTIONAL_REFERRER_COL in header else -1
+        
+        hq_idx = -1
+        for hq_col in ["영업본부명", "관리본부명"]:
+            if hq_col in header:
+                hq_idx = header.index(hq_col)
+                break
 
         i_branch, i_agent, i_aff = idx["영업지사명"], idx["영업자명"], idx["영업자소속"]
         i_date, i_status = idx["청약일자"], idx["계약상태(중)"]
@@ -168,6 +174,7 @@ def _parse_with_encoding(path, encoding):
                 (row[i_company] if i_company < len(row) else "").strip(),
                 fee,
                 (row[ref_idx] if 0 <= ref_idx < len(row) else "").strip(),
+                (row[hq_idx] if 0 <= hq_idx < len(row) else "").strip(),
             ])
 
     return records, skipped, status_counts
