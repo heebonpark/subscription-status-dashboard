@@ -163,6 +163,10 @@ def _parse_with_encoding(path, encoding):
                 fee = int(fee_raw) if fee_raw not in ("", "-") else 0
             except ValueError:
                 fee = 0
+            
+            if fee == 0:
+                skipped += 1
+                continue
 
             records.append([
                 (row[i_branch] if i_branch < len(row) else "").strip(),

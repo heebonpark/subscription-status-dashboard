@@ -442,8 +442,17 @@
     </div>
 
     <div class="filters" id="month-filters"></div>
-    <div class="filters" id="hq-filters"></div>
-    <div class="filters" id="branch-filters"></div>
+    <div class="filters" id="org-filters">
+      <div class="filter-group" id="hq-filter-group">
+        <span class="flabel">본부</span>
+        <select class="sel" id="hq-sel"></select>
+      </div>
+      <div class="filter-divider" id="org-divider"></div>
+      <div class="filter-group" id="branch-filter-group">
+        <span class="flabel">지사</span>
+        <select class="sel" id="branch-sel"></select>
+      </div>
+    </div>
     <div id="agent-filter-wrap"></div>
     <div id="drilldown-wrap"></div>
 
@@ -903,8 +912,16 @@
 
   function daysBetween(d1, d2) { return Math.round((new Date(d2) - new Date(d1)) / 86400000); }
 
+  function computeHqList(records) {
+    var s = {};
+    records.forEach(function (r) { if (r[9]) s[r[9]] = 1; });
+    var keys = Object.keys(s);
+    return keys.length > 0 ? keys.sort() : null;
+  }
+
   function loadData(data) {
     RECORDS = data.records;
+    ALL_HQS = computeHqList(RECORDS);
     ALL_BRANCHES = computeBranchOrder(RECORDS);
     ALL_DATES = computeDateList(RECORDS);
     var span = ALL_DATES.length ? daysBetween(ALL_DATES[0], ALL_DATES[ALL_DATES.length - 1]) : 0;
@@ -1130,7 +1147,7 @@
   dateToInput.addEventListener("change", handleRangeChange);
 
   function resetAllFilters() {
-    state.branch = null; state.agent = null;
+    state.hq = null; state.branch = null; state.agent = null;
     state.dateFrom = null; state.dateTo = null;
     state.search = "";
     document.getElementById("agent-search").value = "";
@@ -1221,6 +1238,7 @@
       var status = (statusRaw.indexOf("취소") !== -1 || statusRaw.indexOf("해지") !== -1) ? "청약취소" : ((statusRaw === "유지" || statusRaw === "명변유지") ? "유지" : "청약");
       var fee = parseInt(String(r[idx["KTT월정료"]] || "0").replace(/[^0-9-]/g, ""), 10);
       if (isNaN(fee)) fee = 0;
+      if (fee === 0) { skipped++; continue; }
       records.push([
         (r[idx["영업지사명"]] || "").trim(),
         (r[idx["영업자명"]] || "").trim(),
@@ -1245,8 +1263,6 @@
         if (result.records.length === 0) throw new Error("유효한 데이터 행을 찾지 못했습니다.");
         loadData({ records: result.records });
         resetAllFilters();
-        renderHqChipsShell();
-        renderBranchChipsShell();
         populateDateSelects();
         document.getElementById("file-name").textContent =
           f.name + " · " + RECORDS.length.toLocaleString("ko-KR") + "건 로드" + (result.skipped ? " (건너뜀 " + result.skipped + "건)" : "");
@@ -1270,7 +1286,6 @@
   document.getElementById("reset-data-btn").addEventListener("click", function () {
     loadData(DEFAULT_DATA);
     resetAllFilters();
-    renderBranchChipsShell();
     populateDateSelects();
     document.getElementById("file-name").textContent = "";
     document.getElementById("reset-data-btn").style.display = "none";
@@ -1278,76 +1293,38 @@
     render();
   });
 
-  // ---------- branch chips (rebuilt each render for live counts) ----------
-  function renderHqChipsShell() {
-    var wrap = document.getElementById("hq-filters");
-    if (!wrap) return;
-    wrap.innerHTML = "";
-    if (ALL_HQS && ALL_HQS.length > 0) {
-      wrap.appendChild(el("span", "flabel", "본부"));
+  // ---------- org dropdowns (rebuilt each render for live counts) ----------
+  function renderOrgSelects(hqDateRecs) {
+    if (hqSel) {
+      if (!ALL_HQS || ALL_HQS.length === 0) {
+        document.getElementById("hq-filter-group").style.display = "none";
+        document.getElementById("org-divider").style.display = "none";
+      } else {
+        document.getElementById("hq-filter-group").style.display = "";
+        document.getElementById("org-divider").style.display = "";
+        fillSelect(hqSel, ALL_HQS, "전체", function(h) { return h; });
+        hqSel.value = state.hq || "ALL";
+      }
     }
-  }
 
-  function renderHqChips() {
-    var wrap = document.getElementById("hq-filters");
-    if (!wrap || !ALL_HQS || ALL_HQS.length === 0) {
-      if (wrap) wrap.style.display = "none";
-      return;
-    }
-    wrap.style.display = "";
-    wrap.innerHTML = "";
-    wrap.appendChild(el("span", "flabel", "본부"));
+    if (branchSel) {
+      var counts = {};
+      aggregateByBranch(hqDateRecs).forEach(function (r) { counts[r.branch] = r; });
+      var hqBranches = {};
+      if (state.hq) {
+        hqDateRecs.forEach(function(r) { hqBranches[r[0]] = true; });
+      }
 
-    var allChip = el("button", "chip" + (!state.hq ? " active" : ""), "전체");
-    allChip.addEventListener("click", function () { state.hq = null; state.branch = null; state.agent = null; render(); });
-    wrap.appendChild(allChip);
-
-    ALL_HQS.forEach(function (h) {
-      var chip = el("button", "chip" + (state.hq === h ? " active" : ""), h);
-      chip.addEventListener("click", function () {
-        state.hq = (state.hq === h) ? null : h;
-        state.branch = null;
-        state.agent = null;
-        render();
+      var branchList = ALL_BRANCHES.filter(function(b) {
+        return !(state.hq && !hqBranches[b]);
       });
-      wrap.appendChild(chip);
-    });
-  }
 
-  function renderBranchChipsShell() {
-    var wrap = document.getElementById("branch-filters");
-    wrap.innerHTML = "";
-    wrap.appendChild(el("span", "flabel", "지사"));
-  }
-
-  function renderBranchChips(hqDateRecs) {
-    var wrap = document.getElementById("branch-filters");
-    wrap.innerHTML = "";
-    wrap.appendChild(el("span", "flabel", state.hq ? state.hq + " 지사" : "지사"));
-    var counts = {};
-    aggregateByBranch(hqDateRecs).forEach(function (r) { counts[r.branch] = r; });
-
-    var allChip = el("button", "chip" + (!state.branch ? " active" : ""), "전체");
-    allChip.addEventListener("click", function () { state.branch = null; state.agent = null; render(); });
-    wrap.appendChild(allChip);
-
-    var hqBranches = {};
-    if (state.hq) {
-      hqDateRecs.forEach(function(r) { hqBranches[r[0]] = true; });
-    }
-
-    ALL_BRANCHES.forEach(function (b) {
-      if (state.hq && !hqBranches[b]) return;
-      var c = counts[b];
-      var label = shortBranch(b) + " (" + fmtMetric(c ? c[state.metric] : 0, state.metric) + ")";
-      var chip = el("button", "chip" + (state.branch === b ? " active" : ""), label);
-      chip.addEventListener("click", function () {
-        state.branch = (state.branch === b) ? null : b;
-        state.agent = null;
-        render();
+      fillSelect(branchSel, branchList, "전체", function(b) {
+        var c = counts[b];
+        return shortBranch(b) + " (" + fmtMetric(c ? c[state.metric] : 0, state.metric) + ")";
       });
-      wrap.appendChild(chip);
-    });
+      branchSel.value = state.branch || "ALL";
+    }
   }
 
   // ---------- agent drill-down chips ----------
@@ -3242,8 +3219,7 @@
 
     updateSubtitle();
     renderMonthButtons();
-    renderHqChips();
-    renderBranchChips(hqRecs);
+    renderOrgSelects(hqRecs);
     renderAgentFilterWrap(bdRecs);
     renderDrilldown(full);
     renderSummary(full, dateRecs);
@@ -3263,8 +3239,6 @@
 
   // ---------- init ----------
   loadData(DEFAULT_DATA);
-  renderHqChipsShell();
-  renderBranchChipsShell();
   buildLegend("legend-branch");
   buildLegend("legend-date");
   populateDateSelects();
