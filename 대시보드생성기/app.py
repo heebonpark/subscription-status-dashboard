@@ -98,8 +98,25 @@ class CsvFormatError(Exception):
     pass
 
 
+def _set_max_csv_field_size():
+    """csv.field_size_limit()은 내부적으로 C의 long 타입을 사용합니다.
+    Windows에서는 64비트 파이썬이라도 C의 long이 32비트라서, 64비트 값인
+    sys.maxsize를 그대로 넘기면 OverflowError가 납니다(macOS/Linux에서는
+    C의 long이 64비트라 문제없이 통과되어 여기서만 발견되지 않았던 문제).
+    실제로 넘어가는 가장 큰 값을 찾아 설정합니다."""
+    limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(limit)
+            return
+        except OverflowError:
+            limit //= 10
+
+
+_set_max_csv_field_size()
+
+
 def _parse_with_encoding(path, encoding):
-    csv.field_size_limit(sys.maxsize)
     records = []
     skipped = 0
     status_counts = {}
