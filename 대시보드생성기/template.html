@@ -442,6 +442,7 @@
     </div>
 
     <div class="filters" id="month-filters"></div>
+    <div class="filters" id="hq-filters"></div>
     <div class="filters" id="branch-filters"></div>
     <div id="agent-filter-wrap"></div>
     <div id="drilldown-wrap"></div>
@@ -770,10 +771,10 @@
   var REQUIRED_COLS = ["영업지사명", "영업자명", "영업자소속", "청약일자", "계약상태(중)", "계약번호", "상호", "KTT월정료"];
   var PLACEHOLDER_AGENT = "추천자와동일";
 
-  var RECORDS, ALL_BRANCHES, ALL_DATES;
+  var RECORDS, ALL_HQS, ALL_BRANCHES, ALL_DATES;
 
   var state = {
-    branch: null, agent: null,
+    hq: null, branch: null, agent: null,
     dateFrom: null, dateTo: null,
     search: "",
     sortKey: "total", sortDir: -1,
@@ -870,6 +871,12 @@
     });
   }
 
+  function computeHqOrder(records) {
+    var counts = {};
+    records.forEach(function (r) { if (r[9]) counts[r[9]] = (counts[r[9]] || 0) + 1; });
+    return Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+  }
+
   function computeBranchOrder(records) {
     var order = ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주지사", "중앙지사", "강북지사", "서대문지사", "고양지사", "의정부지사", "남양주지사", "강릉지사"];
     var counts = {};
@@ -921,8 +928,16 @@
     });
   }
   function dateOnlyRecords() { return baseRecords().filter(function (r) { return inDateRange(r[3]); }); }
+  function hqDateRecords() {
+    return baseRecords().filter(function (r) {
+      if (state.hq && r[9] !== state.hq) return false;
+      if (!inDateRange(r[3])) return false;
+      return true;
+    });
+  }
   function branchDateRecords() {
     return baseRecords().filter(function (r) {
+      if (state.hq && r[9] !== state.hq) return false;
       if (state.branch && r[0] !== state.branch) return false;
       if (!inDateRange(r[3])) return false;
       return true;
@@ -930,6 +945,7 @@
   }
   function fullScopedRecords() {
     return baseRecords().filter(function (r) {
+      if (state.hq && r[9] !== state.hq) return false;
       if (state.branch && r[0] !== state.branch) return false;
       if (state.agent && r[1] !== state.agent) return false;
       if (!inDateRange(r[3])) return false;
@@ -938,6 +954,7 @@
   }
   function branchAgentRecords() {
     return baseRecords().filter(function (r) {
+      if (state.hq && r[9] !== state.hq) return false;
       if (state.branch && r[0] !== state.branch) return false;
       if (state.agent && r[1] !== state.agent) return false;
       return true;
@@ -1258,24 +1275,65 @@
   });
 
   // ---------- branch chips (rebuilt each render for live counts) ----------
+  function renderHqChipsShell() {
+    var wrap = document.getElementById("hq-filters");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    if (ALL_HQS && ALL_HQS.length > 0) {
+      wrap.appendChild(el("span", "flabel", "본부"));
+    }
+  }
+
+  function renderHqChips() {
+    var wrap = document.getElementById("hq-filters");
+    if (!wrap || !ALL_HQS || ALL_HQS.length === 0) {
+      if (wrap) wrap.style.display = "none";
+      return;
+    }
+    wrap.style.display = "";
+    wrap.innerHTML = "";
+    wrap.appendChild(el("span", "flabel", "본부"));
+
+    var allChip = el("button", "chip" + (!state.hq ? " active" : ""), "전체");
+    allChip.addEventListener("click", function () { state.hq = null; state.branch = null; state.agent = null; render(); });
+    wrap.appendChild(allChip);
+
+    ALL_HQS.forEach(function (h) {
+      var chip = el("button", "chip" + (state.hq === h ? " active" : ""), h);
+      chip.addEventListener("click", function () {
+        state.hq = (state.hq === h) ? null : h;
+        state.branch = null;
+        state.agent = null;
+        render();
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
   function renderBranchChipsShell() {
     var wrap = document.getElementById("branch-filters");
     wrap.innerHTML = "";
     wrap.appendChild(el("span", "flabel", "지사"));
   }
 
-  function renderBranchChips(dateRecs) {
+  function renderBranchChips(hqDateRecs) {
     var wrap = document.getElementById("branch-filters");
     wrap.innerHTML = "";
-    wrap.appendChild(el("span", "flabel", "지사"));
+    wrap.appendChild(el("span", "flabel", state.hq ? state.hq + " 지사" : "지사"));
     var counts = {};
-    aggregateByBranch(dateRecs).forEach(function (r) { counts[r.branch] = r; });
+    aggregateByBranch(hqDateRecs).forEach(function (r) { counts[r.branch] = r; });
 
     var allChip = el("button", "chip" + (!state.branch ? " active" : ""), "전체");
     allChip.addEventListener("click", function () { state.branch = null; state.agent = null; render(); });
     wrap.appendChild(allChip);
 
+    var hqBranches = {};
+    if (state.hq) {
+      hqDateRecs.forEach(function(r) { hqBranches[r[0]] = true; });
+    }
+
     ALL_BRANCHES.forEach(function (b) {
+      if (state.hq && !hqBranches[b]) return;
       var c = counts[b];
       var label = shortBranch(b) + " (" + fmtMetric(c ? c[state.metric] : 0, state.metric) + ")";
       var chip = el("button", "chip" + (state.branch === b ? " active" : ""), label);
@@ -1400,60 +1458,28 @@
 
   // ---------- summary card ----------
   function renderSummary(full, dateRecs) {
-    var card = document.getElementById("summary-card");
-    card.innerHTML = "";
-    card.appendChild(el("h2", null, "요약현황"));
+    var scopeLabel = state.branch ? (shortBranch(state.branch) + (state.agent ? " · " + state.agent : "")) : (state.hq ? state.hq : "전체 지사");
+    document.getElementById("summary-scope").textContent = scopeLabel;
+    
+    var hqStr = state.hq ? " · " + state.hq : "";
+    document.getElementById("summary-date").textContent = (state.dateFrom || "전체") + " ~ " + (state.dateTo || "전체") + hqStr;
+    document.getElementById("summary-count").textContent = fmtMetric(full.length, "count");
 
-    var scopeLabel = state.branch ? (shortBranch(state.branch) + (state.agent ? " · " + state.agent : "")) : "전체 지사";
-    var dateLabel = (state.dateFrom || state.dateTo)
-      ? ((state.dateFrom || ALL_DATES[0]) + " ~ " + (state.dateTo || ALL_DATES[ALL_DATES.length - 1]))
-      : "전체 기간";
-
-    var bucket = emptyBucket();
-    full.forEach(function (r) { addToBucket(bucket, r); });
-    var total = bucketTotal(bucket, "count");
-    var totalFee = bucketTotal(bucket, "fee");
-    var maintain = bucket["유지"].count, cancel = bucket["청약취소"].count, pending = bucket["청약"].count;
-    var convRate = (maintain + cancel) > 0 ? (maintain / (maintain + cancel) * 100) : null;
-
-    var text = scopeLabel + " · " + dateLabel + " 기준으로 총 " + fmt(total) + "건이 접수되어 월정료 합계 " +
-      fmtFeeMillion(totalFee) + "을 기록했습니다.";
-    card.appendChild(el("p", "summary-text", text));
-
-    var statusRow = el("div", "summary-status-row");
-    STATUSES.forEach(function (s) {
-      var box = el("div", "summary-status-item");
-      var head = el("div", "ssi-head");
-      var sw = document.createElement("span");
-      sw.className = "swatch";
-      sw.style.background = STATUS_COLOR[s];
-      head.appendChild(sw);
-      head.appendChild(document.createTextNode(STATUS_LABEL[s]));
-      box.appendChild(head);
-      box.appendChild(el("div", "ssi-count", fmt(bucket[s].count) + "건"));
-      box.appendChild(el("div", "ssi-fee", fmtFeeMillion(bucket[s].fee)));
-      statusRow.appendChild(box);
-    });
-    card.appendChild(statusRow);
-
-    var convText = convRate === null ? "유지전환율을 계산할 데이터가 없습니다." : ("유지전환율은 " + convRate.toFixed(1) + "%입니다.");
-    card.appendChild(el("p", "sub", convText));
-
-    var detailWrap = el("div", "summary-detail" + (state.summaryOpen ? " open" : ""));
+    var wrap = document.getElementById("summary-detail");
+    wrap.innerHTML = "";
     var breakdown = (state.branch ? aggregateByAgent(full) : aggregateByBranch(dateRecs)).slice()
       .sort(function (a, b) { return b.count - a.count; });
     breakdown.forEach(function (row) {
       var name = state.branch ? row.agent : shortBranch(row.branch);
       var line = el("div", null, name + " — " + fmt(row.count) + "건 · " + fmtFeeMillion(row.fee));
       line.style.padding = "3px 0";
-      detailWrap.appendChild(line);
+      wrap.appendChild(line);
     });
-    if (breakdown.length === 0) detailWrap.appendChild(el("div", null, "표시할 세부 항목이 없습니다."));
-    card.appendChild(detailWrap);
+    if (breakdown.length === 0) wrap.appendChild(el("div", null, "표시할 세부 항목이 없습니다."));
 
     var toggle = el("button", "collapse-toggle", state.summaryOpen ? "접기" : "자세히 보기");
     toggle.addEventListener("click", function () { state.summaryOpen = !state.summaryOpen; render(); });
-    card.appendChild(toggle);
+    wrap.appendChild(toggle);
   }
 
   // ---------- KPI tiles ----------
@@ -1741,8 +1767,8 @@
     gcInput.value = state.goal.count != null ? state.goal.count : "";
     gfInput.value = state.goal.fee != null ? Math.round(state.goal.fee / 1000) : "";
     document.getElementById("auto-goal-btn").disabled = !currentForecast;
-    document.getElementById("goal-scope-label").textContent =
-      (state.branch ? (shortBranch(state.branch) + (state.agent ? (" · " + state.agent) : "")) : "전체") + " 목표";
+    var t = document.getElementById("goal-title");
+    if (t) t.textContent = (state.branch ? (shortBranch(state.branch) + (state.agent ? (" · " + state.agent) : "")) : (state.hq ? state.hq : "전체")) + " 목표";
 
     updateGoalMeters();
   }
@@ -1917,8 +1943,13 @@
     var rows = aggregateByAgent(records).sort(function (a, b) { return b[state.metric] - a[state.metric]; });
     rows = rows.slice(0, state.topN);
     document.getElementById("topn-label").textContent = state.topN;
-    document.getElementById("top10-sub").textContent =
-      (state.branch ? shortBranch(state.branch) + " 내 " : "전체 지사 ") + (state.metric === "fee" ? "월정료" : "건수") + " 기준 상위 영업자 · 청약일자 필터 적용 · 클릭 시 상세보기";
+    var head = document.getElementById("top10-head");
+    if (head) {
+      head.innerHTML = "";
+      head.appendChild(el("span", "sub",
+      (state.branch ? shortBranch(state.branch) + " 내 " : (state.hq ? state.hq + " 내 " : "전체 지사 ")) + (state.metric === "fee" ? "월정료" : "건수") + " 기준 상위 영업자 · 청약일자 필터 적용 · 클릭 시 상세보기"
+      ));
+    }
 
     var wrap = document.getElementById("top10-chart");
     wrap.innerHTML = "";
@@ -2192,6 +2223,9 @@
 
   // ---------- trend chart ----------
   function renderTrend(records) {
+    document.getElementById("trend-title").textContent =
+      (state.metric === "fee" ? "월정료" : "건수") + " 추이" +
+      (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : ""));
     var g = state.trendGranularity;
     var buckets = [];
     var seenKey = {};
@@ -2211,7 +2245,7 @@
     var gLabel = g === "year" ? "년별" : (g === "month" ? "월별" : "일별");
     document.getElementById("date-sub").textContent =
       (state.trendView === "cumulative" ? "누적 " : "") + gLabel + " " + (state.metric === "fee" ? "월정료" : "건수") + " 추이" +
-      (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : "");
+      (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : ""));
 
     var chartEl = document.getElementById("date-chart");
     var axisEl = document.getElementById("date-axis");
@@ -2598,6 +2632,12 @@
   }
 
   function renderMonthlyAnalysis(records) {
+    document.getElementById("month-anal-title").textContent =
+      "월별 상세 분석" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : ""));
+    var sub = document.getElementById("month-anal-sub");
+    if (sub) sub.textContent =
+      "월별 유지·청약·취소/해지 건수와 전월 대비 증감입니다" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + ".";
+
     var byMonth = {};
     records.forEach(function (r) {
       var ym = r[3].slice(0, 7);
@@ -2646,9 +2686,6 @@
       }
       prevMaintain = maintain; prevPending = pending; prevTotal = total;
     });
-
-    document.getElementById("monthly-analysis-sub").textContent =
-      "월별 유지·청약·취소/해지 건수와 전월 대비 증감입니다" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : "") + ".";
 
     var momEl = document.getElementById("monthly-mom-note");
     if (bestIncTotal && bestDecTotal) {
@@ -2817,7 +2854,7 @@
 
     var indexMode = state.yoyMode === "index";
     var yoyDeltaMode = state.yoyMode === "yoy";
-    var scopeSuffix = (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : "") + ".";
+    var scopeSuffix = (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + ".";
     document.getElementById("yoy-sub").textContent = yoyDeltaMode
       ? "같은 달을 전년과 비교해 증감률이 큰 달을 찾습니다(YoY = 전년 동월 대비)" + scopeSuffix
       : indexMode
@@ -3177,12 +3214,14 @@
 
   function render() {
     var dateRecs = dateOnlyRecords();
+    var hqRecs = hqDateRecords();
     var bdRecs = branchDateRecords();
     var full = fullScopedRecords();
 
     updateSubtitle();
     renderMonthButtons();
-    renderBranchChips(dateRecs);
+    renderHqChips();
+    renderBranchChips(hqRecs);
     renderAgentFilterWrap(bdRecs);
     renderDrilldown(full);
     renderSummary(full, dateRecs);
@@ -3202,6 +3241,7 @@
 
   // ---------- init ----------
   loadData(DEFAULT_DATA);
+  renderHqChipsShell();
   renderBranchChipsShell();
   buildLegend("legend-branch");
   buildLegend("legend-date");
