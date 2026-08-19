@@ -35,7 +35,19 @@ except ImportError:
     sys.exit(1)
 
 APP_TITLE = "청약현황 대시보드 생성기"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
+
+# 대시보드 HTML의 색상 톤과 맞춘 팔레트
+COLOR_ACCENT = "#2a78d6"
+COLOR_ACCENT_HOVER = "#2264b8"
+COLOR_ACCENT_ACTIVE = "#1a4f96"
+COLOR_ACCENT_DISABLED = "#a9c6ea"
+COLOR_BG = "#f4f5f7"
+COLOR_CARD = "#ffffff"
+COLOR_BORDER = "#dde1e6"
+COLOR_TEXT = "#111418"
+COLOR_MUTED = "#68707b"
+COLOR_GOOD = "#0ca30c"
 
 if getattr(sys, "frozen", False):
     # PyInstaller(--onefile)로 빌드된 실행 파일인 경우:
@@ -233,8 +245,9 @@ class DashboardApp:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE + " v" + APP_VERSION)
-        self.root.geometry("760x620")
-        self.root.minsize(680, 520)
+        self.root.geometry("820x680")
+        self.root.minsize(700, 560)
+        self.root.configure(bg=COLOR_BG)
 
         self.cfg = load_config()
         self.input_var = tk.StringVar(value=self.cfg.get("last_input", ""))
@@ -250,84 +263,186 @@ class DashboardApp:
 
     def _build_style(self):
         style = ttk.Style()
+        # clam은 색상을 완전히 커스터마이즈할 수 있는 유일한 내장 테마라
+        # 대시보드와 톤을 맞춘 버튼/진행바 색을 정확히 낼 수 있습니다.
         try:
-            style.theme_use(style.theme_use())
+            style.theme_use("clam")
         except Exception:
             pass
-        style.configure("Title.TLabel", font=("Segoe UI", 15, "bold"))
-        style.configure("Sub.TLabel", foreground="#666666")
-        style.configure("Primary.TButton", font=("Segoe UI", 10, "bold"))
-        style.configure("Section.TLabelframe.Label", font=("Segoe UI", 9, "bold"))
+
+        base_font = ("Segoe UI", 10)
+        style.configure(".", font=base_font, background=COLOR_BG, foreground=COLOR_TEXT)
+
+        style.configure("TFrame", background=COLOR_BG)
+        style.configure("Card.TFrame", background=COLOR_CARD)
+
+        style.configure("TLabel", background=COLOR_BG, foreground=COLOR_TEXT)
+        style.configure("Title.TLabel", font=("Segoe UI", 17, "bold"), background=COLOR_BG, foreground=COLOR_TEXT)
+        style.configure("Sub.TLabel", font=("Segoe UI", 9), background=COLOR_BG, foreground=COLOR_MUTED)
+        style.configure("Status.TLabel", font=("Segoe UI", 9), background=COLOR_BG, foreground=COLOR_MUTED)
+
+        style.configure(
+            "TLabelframe", background=COLOR_BG, bordercolor=COLOR_BORDER,
+            lightcolor=COLOR_BORDER, darkcolor=COLOR_BORDER, borderwidth=1, relief="solid",
+        )
+        style.configure(
+            "Section.TLabelframe.Label", font=("Segoe UI", 10, "bold"),
+            background=COLOR_BG, foreground=COLOR_TEXT,
+        )
+
+        style.configure(
+            "TEntry", padding=7, fieldbackground=COLOR_CARD,
+            bordercolor=COLOR_BORDER, lightcolor=COLOR_BORDER, darkcolor=COLOR_BORDER,
+        )
+        style.map("TEntry", bordercolor=[("focus", COLOR_ACCENT)])
+
+        style.configure(
+            "TButton", font=("Segoe UI", 9), padding=(12, 7),
+            background=COLOR_CARD, foreground=COLOR_TEXT,
+            bordercolor=COLOR_BORDER, lightcolor=COLOR_CARD, darkcolor=COLOR_CARD,
+        )
+        style.map(
+            "TButton",
+            background=[("active", "#eef1f5"), ("pressed", "#e4e8ed")],
+        )
+
+        style.configure(
+            "Primary.TButton", font=("Segoe UI", 11, "bold"), padding=(20, 10),
+            background=COLOR_ACCENT, foreground="#ffffff",
+            bordercolor=COLOR_ACCENT, lightcolor=COLOR_ACCENT, darkcolor=COLOR_ACCENT,
+        )
+        style.map(
+            "Primary.TButton",
+            background=[
+                ("disabled", COLOR_ACCENT_DISABLED),
+                ("pressed", COLOR_ACCENT_ACTIVE),
+                ("active", COLOR_ACCENT_HOVER),
+            ],
+            foreground=[("disabled", "#f0f4fa")],
+        )
+
+        style.configure("TCheckbutton", background=COLOR_BG, foreground=COLOR_TEXT, font=("Segoe UI", 9))
+        style.map("TCheckbutton", background=[("active", COLOR_BG)])
+
+        style.configure(
+            "Horizontal.TProgressbar", background=COLOR_ACCENT, troughcolor="#e6e9ee",
+            bordercolor="#e6e9ee", lightcolor=COLOR_ACCENT, darkcolor=COLOR_ACCENT, thickness=10,
+        )
+
+        style.configure("TSeparator", background=COLOR_BORDER)
+        style.configure(
+            "Vertical.TScrollbar", background="#d3d8de", troughcolor=COLOR_CARD,
+            bordercolor=COLOR_CARD, arrowcolor=COLOR_MUTED,
+        )
+
+    def _badge(self, parent, text, size=22):
+        badge = tk.Frame(parent, bg=COLOR_ACCENT, width=size, height=size)
+        badge.pack_propagate(False)
+        tk.Label(
+            badge, text=text, font=("Segoe UI", 9, "bold"), bg=COLOR_ACCENT, fg="#ffffff",
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        return badge
+
+    def _section_label(self, labelframe, number, title):
+        row = tk.Frame(labelframe, bg=COLOR_BG)
+        self._badge(row, str(number)).pack(side="left", padx=(0, 7))
+        tk.Label(
+            row, text=title, font=("Segoe UI", 10, "bold"), bg=COLOR_BG, fg=COLOR_TEXT,
+        ).pack(side="left")
+        return row
 
     def _build_widgets(self):
-        pad = {"padx": 14, "pady": 8}
+        pad = {"padx": 16, "pady": 9}
 
+        # 헤더 (아이콘 마크 + 제목 + 부제)
         header = ttk.Frame(self.root)
-        header.pack(fill="x", padx=14, pady=(14, 4))
-        ttk.Label(header, text=APP_TITLE, style="Title.TLabel").pack(anchor="w")
+        header.pack(fill="x", padx=16, pady=(18, 6))
+        mark = tk.Frame(header, bg=COLOR_ACCENT, width=36, height=36)
+        mark.pack_propagate(False)
+        tk.Label(mark, text="청", font=("Segoe UI", 13, "bold"), bg=COLOR_ACCENT, fg="#ffffff").place(
+            relx=0.5, rely=0.5, anchor="center"
+        )
+        mark.pack(side="left", anchor="n")
+        title_col = ttk.Frame(header)
+        title_col.pack(side="left", fill="x", expand=True, padx=(12, 0))
+        ttk.Label(title_col, text=APP_TITLE, style="Title.TLabel").pack(anchor="w")
         ttk.Label(
-            header,
+            title_col,
             text="청약 실적 CSV를 선택하면 청약현황 대시보드(HTML)를 자동으로 만들어 드립니다.",
             style="Sub.TLabel",
         ).pack(anchor="w", pady=(2, 0))
 
         # 입력 파일
-        in_frame = ttk.LabelFrame(self.root, text="1. 실적 CSV 파일", style="Section.TLabelframe")
+        in_frame = ttk.LabelFrame(self.root)
+        in_frame.configure(labelwidget=self._section_label(in_frame, 1, "실적 CSV 파일"))
         in_frame.pack(fill="x", **pad)
         row1 = ttk.Frame(in_frame)
-        row1.pack(fill="x", padx=10, pady=10)
-        ttk.Entry(row1, textvariable=self.input_var).pack(side="left", fill="x", expand=True)
+        row1.pack(fill="x", padx=12, pady=12)
+        ttk.Entry(row1, textvariable=self.input_var).pack(side="left", fill="x", expand=True, ipady=2)
         ttk.Button(row1, text="찾아보기...", command=self.pick_input).pack(side="left", padx=(8, 0))
 
         # 출력 파일
-        out_frame = ttk.LabelFrame(self.root, text="2. 생성할 대시보드 HTML", style="Section.TLabelframe")
+        out_frame = ttk.LabelFrame(self.root)
+        out_frame.configure(labelwidget=self._section_label(out_frame, 2, "생성할 대시보드 HTML"))
         out_frame.pack(fill="x", **pad)
         row2 = ttk.Frame(out_frame)
-        row2.pack(fill="x", padx=10, pady=10)
-        ttk.Entry(row2, textvariable=self.output_var).pack(side="left", fill="x", expand=True)
+        row2.pack(fill="x", padx=12, pady=12)
+        ttk.Entry(row2, textvariable=self.output_var).pack(side="left", fill="x", expand=True, ipady=2)
         ttk.Button(row2, text="다른 이름으로...", command=self.pick_output).pack(side="left", padx=(8, 0))
 
         opt_row = ttk.Frame(out_frame)
-        opt_row.pack(fill="x", padx=10, pady=(0, 10))
+        opt_row.pack(fill="x", padx=12, pady=(0, 12))
         ttk.Checkbutton(
             opt_row, text="생성 후 브라우저에서 바로 열기", variable=self.open_after_var
         ).pack(anchor="w")
 
         # 실행 버튼 + 진행바
         action_frame = ttk.Frame(self.root)
-        action_frame.pack(fill="x", padx=14, pady=(4, 4))
+        action_frame.pack(fill="x", padx=16, pady=(6, 6))
         self.generate_btn = ttk.Button(
-            action_frame, text="대시보드 생성", style="Primary.TButton", command=self.on_generate
+            action_frame, text="▶  대시보드 생성", style="Primary.TButton", command=self.on_generate
         )
         self.generate_btn.pack(side="left")
         self.progress = ttk.Progressbar(action_frame, mode="indeterminate")
-        self.progress.pack(side="left", fill="x", expand=True, padx=(12, 0))
+        self.progress.pack(side="left", fill="x", expand=True, padx=(14, 0), ipady=1)
+
+        # 상태바 (log_frame이 expand=True로 남은 공간을 전부 차지하기 전에
+        # 먼저 pack해야 실제로 높이를 배정받습니다 — pack()은 side 값과 무관하게
+        # 호출 순서대로 공간을 먼저 차지한 위젯이 우선합니다)
+        status_bar = ttk.Frame(self.root)
+        status_bar.pack(fill="x", side="bottom")
+        ttk.Separator(status_bar).pack(fill="x")
+        ttk.Label(
+            status_bar, textvariable=self.status_var, style="Status.TLabel", padding=(12, 6)
+        ).pack(anchor="w")
 
         # 로그
-        log_frame = ttk.LabelFrame(self.root, text="처리 로그", style="Section.TLabelframe")
-        log_frame.pack(fill="both", expand=True, padx=14, pady=(4, 8))
-        log_inner = ttk.Frame(log_frame)
-        log_inner.pack(fill="both", expand=True, padx=8, pady=8)
-        self.log_text = tk.Text(log_inner, wrap="word", height=14, font=("Consolas", 9), state="disabled")
+        log_frame = ttk.LabelFrame(self.root)
+        log_frame.configure(labelwidget=self._section_label(log_frame, 3, "처리 로그"))
+        log_frame.pack(fill="both", expand=True, padx=16, pady=(6, 10))
+        log_inner = tk.Frame(
+            log_frame, bg=COLOR_CARD, highlightthickness=1, highlightbackground=COLOR_BORDER,
+        )
+        log_inner.pack(fill="both", expand=True, padx=12, pady=12)
+        self.log_text = tk.Text(
+            log_inner, wrap="word", height=14, font=("Consolas", 10),
+            bg=COLOR_CARD, fg=COLOR_TEXT, insertbackground=COLOR_TEXT,
+            relief="flat", borderwidth=0, padx=10, pady=8, state="disabled",
+        )
+        self.log_text.tag_configure("error", foreground="#d03b3b")
         scroll = ttk.Scrollbar(log_inner, command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=scroll.set)
         self.log_text.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
-
-        # 상태바
-        status_bar = ttk.Frame(self.root)
-        status_bar.pack(fill="x", side="bottom")
-        ttk.Separator(status_bar).pack(fill="x")
-        ttk.Label(status_bar, textvariable=self.status_var, padding=(10, 4)).pack(anchor="w")
 
         if not self.input_var.get():
             self._log("CSV 파일을 선택한 뒤 [대시보드 생성] 버튼을 누르세요.")
 
     # ---- 로그 유틸 ----------------------------------------------------------
 
-    def _log(self, text):
+    def _log(self, text, error=False):
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", text + "\n")
+        self.log_text.insert("end", text + "\n", ("error",) if error else ())
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
@@ -457,14 +572,36 @@ class DashboardApp:
         self.progress.stop()
         self.generate_btn.configure(state="normal")
         self.status_var.set("오류 발생")
-        self._log("\n[오류] " + title + "\n" + message)
+        self._log("\n[오류] " + title + "\n" + message, error=True)
         messagebox.showerror(APP_TITLE + " - " + title, message)
 
 
+def _enable_windows_dpi_awareness():
+    """Windows에서 화면(고해상도/DPI 배율)을 흐릿하게 강제 확대하지 않고,
+    실제 해상도 그대로 또렷하게 그리도록 프로세스를 DPI-aware로 선언합니다.
+    반드시 tk.Tk()를 만들기 전에 호출해야 합니다."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+    except Exception:
+        try:
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
 def main():
+    _enable_windows_dpi_awareness()
     root = tk.Tk()
     try:
-        root.call("tk", "scaling", 1.2)
+        # 하드코딩된 배율 대신, 실제 시스템 DPI를 읽어 그에 맞춰 Tk 배율을 맞춥니다
+        # (100%/125%/150%/200% 등 어떤 배율이든 또렷하게 보이도록).
+        dpi_scale = root.winfo_fpixels("1i") / 72.0
+        if dpi_scale > 0:
+            root.call("tk", "scaling", dpi_scale)
     except Exception:
         pass
     app = DashboardApp(root)
