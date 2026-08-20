@@ -168,6 +168,10 @@ def _parse_with_encoding(path, encoding):
                 skipped += 1
                 continue
 
+            hq_val = (row[hq_idx] if 0 <= hq_idx < len(row) else "").strip()
+            if hq_val == "강원본부": hq_val = "강북/강원본부"
+            elif hq_val == "서부본부": hq_val = "강남/서부본부"
+
             records.append([
                 (row[i_branch] if i_branch < len(row) else "").strip(),
                 (row[i_agent] if i_agent < len(row) else "").strip(),
@@ -178,7 +182,7 @@ def _parse_with_encoding(path, encoding):
                 (row[i_company] if i_company < len(row) else "").strip(),
                 fee,
                 (row[ref_idx] if 0 <= ref_idx < len(row) else "").strip(),
-                (row[hq_idx] if 0 <= hq_idx < len(row) else "").strip(),
+                hq_val,
             ])
 
     return records, skipped, status_counts

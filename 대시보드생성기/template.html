@@ -1264,6 +1264,9 @@
       var fee = parseInt(String(r[idx["KTT월정료"]] || "0").replace(/[^0-9-]/g, ""), 10);
       if (isNaN(fee)) fee = 0;
       if (fee === 0) { skipped++; continue; }
+      var hqVal = hqIdx >= 0 ? (r[hqIdx] || "").trim() : "";
+      if (hqVal === "강원본부") hqVal = "강북/강원본부";
+      else if (hqVal === "서부본부") hqVal = "강남/서부본부";
       records.push([
         (r[idx["영업지사명"]] || "").trim(),
         (r[idx["영업자명"]] || "").trim(),
@@ -1273,7 +1276,7 @@
         (r[idx["상호"]] || "").trim(),
         fee,
         referrerIdx >= 0 ? (r[referrerIdx] || "").trim() : "",
-        hqIdx >= 0 ? (r[hqIdx] || "").trim() : ""
+        hqVal
       ]);
     }
     return { records: records, skipped: skipped };
