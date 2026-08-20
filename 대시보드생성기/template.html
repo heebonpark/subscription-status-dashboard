@@ -446,6 +446,7 @@
       <div class="filter-group" id="hq-filter-group">
         <span class="flabel">본부</span>
         <select class="sel" id="hq-sel"></select>
+        <button class="reset-btn" id="hq-gangbuk-btn" style="margin-left:8px; background:var(--primary); color:white; border:none; padding:4px 10px;">강북/강원 전용</button>
       </div>
       <div class="filter-divider" id="org-divider"></div>
       <div class="filter-group" id="branch-filter-group">
@@ -1188,6 +1189,17 @@
   if (hqSel) {
     hqSel.addEventListener("change", function(e) {
       state.hq = e.target.value === "ALL" ? null : e.target.value;
+      state.branch = null;
+      state.agent = null;
+      render();
+    });
+  }
+  
+  var hqGangbukBtn = document.getElementById("hq-gangbuk-btn");
+  if (hqGangbukBtn) {
+    hqGangbukBtn.addEventListener("click", function() {
+      state.hq = "강북/강원본부";
+      if (hqSel) hqSel.value = "강북/강원본부";
       state.branch = null;
       state.agent = null;
       render();
