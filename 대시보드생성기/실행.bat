@@ -1,50 +1,49 @@
 @echo off
-chcp 65001 >nul
-title ì²­ì•½í˜„í™© ëŒ€ì‹œë³´ë“œ ìƒì„±ê¸°
-echo ì²­ì•½í˜„í™© ëŒ€ì‹œë³´ë“œ ìƒì„±ê¸°ë¥¼ ì¤€ë¹„í•˜ëŠ” ì¤‘ìž…ë‹ˆë‹¤...
+title Ã»¾àÇöÈ² ´ë½Ãº¸µå »ý¼º±â
+echo Ã»¾àÇöÈ² ´ë½Ãº¸µå »ý¼º±â¸¦ ÁØºñÇÏ´Â ÁßÀÔ´Ï´Ù...
 setlocal
 cd /d "%~dp0"
 
-rem py / pyw(Python Launcher)ë¥¼ ìµœìš°ì„ ìœ¼ë¡œ ì‚¬ìš©í•©ë‹ˆë‹¤.
+rem py / pyw(Python Launcher)¸¦ ÃÖ¿ì¼±À¸·Î »ç¿ëÇÕ´Ï´Ù.
 where pyw >nul 2>nul
 if %ERRORLEVEL%==0 (
-    echo Python ì‹¤í–‰ê¸°ë¥¼ ì°¾ì•˜ìŠµë‹ˆë‹¤. í”„ë¡œê·¸ëž¨ì„ ì‹œìž‘í•©ë‹ˆë‹¤...
+    echo Python ½ÇÇà±â¸¦ Ã£¾Ò½À´Ï´Ù. ÇÁ·Î±×·¥À» ½ÃÀÛÇÕ´Ï´Ù...
     start "" pyw "%~dp0app.py"
     goto :done
 )
 
 where py >nul 2>nul
 if %ERRORLEVEL%==0 (
-    echo Python ì‹¤í–‰ê¸°ë¥¼ ì°¾ì•˜ìŠµë‹ˆë‹¤. í”„ë¡œê·¸ëž¨ì„ ì‹œìž‘í•©ë‹ˆë‹¤...
+    echo Python ½ÇÇà±â¸¦ Ã£¾Ò½À´Ï´Ù. ÇÁ·Î±×·¥À» ½ÃÀÛÇÕ´Ï´Ù...
     start "" py -3 "%~dp0app.py"
     goto :done
 )
 
 where pythonw >nul 2>nul
 if %ERRORLEVEL%==0 (
-    echo Pythonì„ ì°¾ì•˜ìŠµë‹ˆë‹¤. í”„ë¡œê·¸ëž¨ì„ ì‹œìž‘í•©ë‹ˆë‹¤...
+    echo PythonÀ» Ã£¾Ò½À´Ï´Ù. ÇÁ·Î±×·¥À» ½ÃÀÛÇÕ´Ï´Ù...
     start "" pythonw "%~dp0app.py"
     goto :done
 )
 
 where python >nul 2>nul
 if %ERRORLEVEL%==0 (
-    echo Pythonì„ ì°¾ì•˜ìŠµë‹ˆë‹¤. í”„ë¡œê·¸ëž¨ì„ ì‹œìž‘í•©ë‹ˆë‹¤...
+    echo PythonÀ» Ã£¾Ò½À´Ï´Ù. ÇÁ·Î±×·¥À» ½ÃÀÛÇÕ´Ï´Ù...
     start "" python "%~dp0app.py"
     goto :done
 )
 
 echo.
-echo [ì˜¤ë¥˜] ì´ ì»´í“¨í„°ì—ì„œ Pythonì„ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.
+echo [¿À·ù] ÀÌ ÄÄÇ»ÅÍ¿¡¼­ PythonÀ» Ã£À» ¼ö ¾ø½À´Ï´Ù.
 echo.
-echo  1^) https://www.python.org/downloads/ ì—ì„œ Python 3.10 ì´ìƒì„ ì„¤ì¹˜í•˜ì„¸ìš”.
-echo  2^) ì„¤ì¹˜ í™”ë©´ì—ì„œ "Add python.exe to PATH" ì²´í¬ë°•ìŠ¤ë¥¼ ë°˜ë“œì‹œ ì„ íƒí•˜ì„¸ìš”.
-echo  3^) ì„¤ì¹˜ê°€ ëë‚˜ë©´ ì´ íŒŒì¼ì„ ë‹¤ì‹œ ì‹¤í–‰í•˜ì„¸ìš”.
+echo  1^) https://www.python.org/downloads/ ¿¡¼­ Python 3.10 ÀÌ»óÀ» ¼³Ä¡ÇÏ¼¼¿ä.
+echo  2^) ¼³Ä¡ È­¸é¿¡¼­ "Add python.exe to PATH" Ã¼Å©¹Ú½º¸¦ ¹Ýµå½Ã ¼±ÅÃÇÏ¼¼¿ä.
+echo  3^) ¼³Ä¡°¡ ³¡³ª¸é ÀÌ ÆÄÀÏÀ» ´Ù½Ã ½ÇÇàÇÏ¼¼¿ä.
 echo.
 pause
 exit /b 1
 
 :done
-echo í”„ë¡œê·¸ëž¨ ì°½ì´ ëœ° ë•Œê¹Œì§€ ëª‡ ì´ˆ ì •ë„ ê±¸ë¦´ ìˆ˜ ìžˆìŠµë‹ˆë‹¤.
+echo ÇÁ·Î±×·¥ Ã¢ÀÌ ¶ã ¶§±îÁö ¸î ÃÊ Á¤µµ °É¸± ¼ö ÀÖ½À´Ï´Ù.
 timeout /t 3 >nul
 exit /b 0
