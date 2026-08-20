@@ -1520,6 +1520,7 @@
     var total = bucketTotal(bucket, "count");
     var totalFee = bucketTotal(bucket, "fee");
     var maintain = bucket["유지"].count, pending = bucket["청약"].count, cancel = bucket["청약취소"].count;
+    var maintainFee = bucket["유지"].fee, pendingFee = bucket["청약"].fee, cancelFee = bucket["청약취소"].fee;
     var cancelRate = total ? (cancel / total * 100) : 0;
     var convRate = (maintain + cancel) > 0 ? (maintain / (maintain + cancel) * 100) : null;
     var agents = {};
@@ -1528,9 +1529,9 @@
     var tiles = [
       { label: "건수", value: fmt(total) + "건", cls: "" },
       { label: "월정료 합계", value: fmtFee(totalFee), cls: "" },
-      { label: "유지", value: fmt(maintain) + "건", cls: "good" },
-      { label: "청약(진행중)", value: fmt(pending) + "건", cls: "warning" },
-      { label: "취소/해지", value: fmt(cancel) + "건", cls: "critical" },
+      { label: "유지", value: fmt(maintain) + "건", subValue: fmtFee(maintainFee), cls: "good" },
+      { label: "청약(진행중)", value: fmt(pending) + "건", subValue: fmtFee(pendingFee), cls: "warning" },
+      { label: "취소/해지", value: fmt(cancel) + "건", subValue: fmtFee(cancelFee), cls: "critical" },
       { label: "취소율", value: cancelRate.toFixed(1) + "%", cls: cancelRate >= 10 ? "critical" : "" },
       { label: "유지전환율", value: convRate === null ? "–" : convRate.toFixed(1) + "%", cls: convRate !== null && convRate < 70 ? "critical" : "good" },
       { label: "활동 영업자", value: fmt(Object.keys(agents).length) + "명", cls: "" }
@@ -1542,6 +1543,17 @@
       var tile = el("div", "tile");
       tile.appendChild(el("div", "tlabel", t.label));
       tile.appendChild(el("div", "tvalue" + (t.cls ? " " + t.cls : ""), t.value));
+      if (t.subValue) {
+        var sub = el("div", "tsubvalue" + (t.cls ? " " + t.cls : ""), t.subValue);
+        sub.style.fontSize = "16px";
+        sub.style.marginTop = "2px";
+        sub.style.fontWeight = "600";
+        sub.style.color = "var(--text-secondary)";
+        if(t.cls === "good") sub.style.color = "var(--good)";
+        if(t.cls === "warning") sub.style.color = "var(--warning)";
+        if(t.cls === "critical") sub.style.color = "var(--critical)";
+        tile.appendChild(sub);
+      }
       wrap.appendChild(tile);
     });
   }
