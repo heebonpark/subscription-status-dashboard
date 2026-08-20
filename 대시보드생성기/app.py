@@ -595,7 +595,10 @@ class DashboardApp:
         self._log("\n대시보드가 생성되었습니다.")
         if self.open_after_var.get():
             try:
-                webbrowser.open(pathlib.Path(output_path).resolve().as_uri())
+                if sys.platform == 'win32':
+                    os.startfile(output_path)
+                else:
+                    webbrowser.open("file://" + os.path.abspath(output_path))
             except Exception:
                 pass
         messagebox.showinfo(APP_TITLE, "대시보드 생성이 완료되었습니다.\n\n" + output_path)
