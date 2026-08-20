@@ -852,12 +852,21 @@
     var map = {};
     records.forEach(function (r) {
       var key = r[0] + "␟" + r[1] + "␟" + r[2];
-      if (!map[key]) map[key] = { branch: r[0], agent: r[1], affiliation: r[2], bucket: emptyBucket() };
+      if (!map[key]) {
+        map[key] = { branch: r[0], agent: r[1], affiliation: r[2], bucket: emptyBucket(), monthly: {} };
+      }
       addToBucket(map[key].bucket, r);
+      var ym = r[3].slice(0, 7);
+      if (!map[key].monthly[ym]) map[key].monthly[ym] = emptyBucket();
+      addToBucket(map[key].monthly[ym], r);
     });
     return Object.keys(map).map(function (k) {
       var m = map[k];
-      return { branch: m.branch, agent: m.agent, affiliation: m.affiliation, bucket: m.bucket, count: bucketTotal(m.bucket, "count"), fee: bucketTotal(m.bucket, "fee") };
+      return {
+        branch: m.branch, agent: m.agent, affiliation: m.affiliation,
+        bucket: m.bucket, count: bucketTotal(m.bucket, "count"), fee: bucketTotal(m.bucket, "fee"),
+        monthly: m.monthly
+      };
     });
   }
 
@@ -1980,10 +1989,24 @@
 
     rows.forEach(function (r, idx) {
       var rowEl = el("div", "branch-row");
-      rowEl.style.gridTemplateColumns = "28px 100px 1fr 76px";
+      rowEl.style.gridTemplateColumns = "28px 100px 1fr 100px 76px"; // Added column for sparkline
+
       var badge = el("span", "rank-badge" + (idx === 0 ? " r1" : idx === 1 ? " r2" : idx === 2 ? " r3" : ""), String(idx + 1));
       rowEl.appendChild(badge);
-      var name = el("div", "bname", r.agent);
+
+      var name = el("div", "bname");
+      name.appendChild(document.createTextNode(r.agent + " "));
+      
+      // Quality Badge Check (유지비중 >= 90%)
+      var totalCnt = r.bucket["유지"].count + r.bucket["청약취소"].count;
+      var convRate = totalCnt > 0 ? (r.bucket["유지"].count / totalCnt * 100) : null;
+      if (convRate >= 90) {
+        var qBadge = el("span", null, "🌟");
+        qBadge.style.fontSize = "10px";
+        qBadge.title = "우수 품질 (유지전환율 90%+ : " + convRate.toFixed(1) + "%)";
+        name.appendChild(qBadge);
+      }
+
       name.title = shortBranch(r.branch);
       name.style.cursor = "pointer";
       name.addEventListener("click", function () { state.branch = r.branch; state.agent = r.agent; render(); });
@@ -2005,6 +2028,43 @@
       seg.addEventListener("blur", hideTooltip);
       track.appendChild(seg);
       rowEl.appendChild(track);
+
+      // Sparkline
+      var sparkWrap = el("div", null);
+      sparkWrap.style.width = "90px";
+      sparkWrap.style.height = "20px";
+      sparkWrap.style.marginTop = "2px";
+      
+      var yms = Object.keys(r.monthly).sort();
+      if (yms.length >= 2) {
+        var sparkSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        sparkSvg.setAttribute("viewBox", "0 0 90 20");
+        sparkSvg.style.width = "100%";
+        sparkSvg.style.height = "100%";
+        sparkSvg.style.display = "block";
+        
+        var mVals = yms.map(function(ym) { return bucketTotal(r.monthly[ym], state.metric); });
+        var mMax = Math.max.apply(null, mVals) || 1;
+        var pts = mVals.map(function(v, i) {
+          return (i / (mVals.length - 1) * 86 + 2) + "," + (18 - (v / mMax) * 16);
+        });
+        
+        var poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        poly.setAttribute("points", pts.join(" "));
+        poly.setAttribute("fill", "none");
+        poly.setAttribute("stroke", "var(--primary)");
+        poly.setAttribute("stroke-width", "2");
+        poly.setAttribute("stroke-linecap", "round");
+        poly.setAttribute("stroke-linejoin", "round");
+        sparkSvg.appendChild(poly);
+        sparkWrap.appendChild(sparkSvg);
+      } else {
+        var noData = el("span", "sub", "데이터부족");
+        noData.style.fontSize = "10px";
+        sparkWrap.appendChild(noData);
+      }
+      rowEl.appendChild(sparkWrap);
+
       rowEl.appendChild(el("div", "btotal", fmtMetric(r[state.metric], state.metric)));
       wrap.appendChild(rowEl);
     });
@@ -3118,10 +3178,21 @@
     tr.appendChild(el("td", null, fmtFee(r.pendingFee)));
     tr.appendChild(el("td", null, fmt(r.cancelCount)));
     tr.appendChild(el("td", null, fmtFee(r.cancelFee)));
+    
     var tdCancelRate = el("td", cancelClass(r.cancelRate), r.cancelRate.toFixed(1) + "%");
+    // Heatmap for cancel rate (red when higher)
+    var cp = Math.min(1, r.cancelRate / 30);
+    tdCancelRate.style.background = "rgba(239, 68, 68, " + (cp * 0.25) + ")";
     tr.appendChild(tdCancelRate);
+    
     var tdConv = el("td", perfClass(r.conv), r.conv === null ? "–" : r.conv.toFixed(1) + "%");
+    if (r.conv !== null) {
+      // Heatmap for conv rate (green when higher)
+      var mp = Math.max(0, (r.conv - 50) / 50);
+      tdConv.style.background = "rgba(16, 185, 129, " + (mp * 0.25) + ")";
+    }
     tr.appendChild(tdConv);
+    
     tr.appendChild(el("td", "badge-cell", perfBadge(r.conv)));
   }
 
