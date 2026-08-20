@@ -431,6 +431,11 @@
       </div>
       <div class="filter-divider"></div>
       <div class="filter-group">
+        <span class="flabel">금액 단위</span>
+        <div class="toggle-group" id="fee-unit-toggle" style="margin-right:16px;">
+          <button data-v="천원" class="active">천원</button>
+          <button data-v="백만원">백만원</button>
+        </div>
         <span class="flabel">영업자 "추천자와동일"</span>
         <div class="toggle-group" id="placeholder-toggle">
           <button data-v="include" class="active">포함</button>
@@ -795,6 +800,7 @@
     search: "",
     sortKey: "total", sortDir: -1,
     branchSortKey: "total", branchSortDir: -1,
+    feeUnit: "천원",
     metric: "count", topN: 10, trendView: "daily", trendGranularity: "month", perfMetric: "전체", miniTrendMetric: "count", miniTrendView: "split",
     showMA: true, showCI: true, showOutliers: true,
     yoyMetric: "count", yoyYears: null, yoyMode: "raw",
@@ -818,11 +824,16 @@
   function monthsSpanMultiYear(months) {
     return months.length > 0 && months[0].slice(0, 4) !== months[months.length - 1].slice(0, 4);
   }
-  function fmtFee(v) { return fmt(Math.round(v / 1000)) + "천원"; }
+  function fmtFee(v) {
+    if (state.feeUnit === "백만원") {
+      var m = v / 1000000;
+      var decimals = Math.abs(m) >= 10 ? 1 : 2;
+      return m.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + "백만원";
+    }
+    return fmt(Math.round(v / 1000)) + "천원";
+  }
   function fmtFeeMillion(v) {
-    var m = v / 1000000;
-    var decimals = Math.abs(m) >= 10 ? 1 : 2;
-    return m.toLocaleString("ko-KR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + "백만원";
+    return fmtFee(v);
   }
   function shortBranch(name) { return name ? name.replace(/지사$/, "") : name; }
   function fmtMetric(v, metric) { return metric === "fee" ? fmtFee(v) : (metric === "percent" ? Math.round(v) + "%" : (fmt(v) + "건")); }
@@ -1183,6 +1194,14 @@
       render();
     });
   });
+  document.querySelectorAll("#fee-unit-toggle button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      state.feeUnit = btn.getAttribute("data-v");
+      document.querySelectorAll("#fee-unit-toggle button").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      render();
+    });
+  });
+
   document.querySelectorAll("#placeholder-toggle button").forEach(function (btn) {
     btn.addEventListener("click", function () {
       state.excludePlaceholder = btn.getAttribute("data-v") === "exclude";
