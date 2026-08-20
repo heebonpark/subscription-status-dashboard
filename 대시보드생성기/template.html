@@ -1176,6 +1176,26 @@
     });
   });
 
+  var hqSel = document.getElementById("hq-sel");
+  var branchSel = document.getElementById("branch-sel");
+
+  if (hqSel) {
+    hqSel.addEventListener("change", function(e) {
+      state.hq = e.target.value === "ALL" ? null : e.target.value;
+      state.branch = null;
+      state.agent = null;
+      render();
+    });
+  }
+
+  if (branchSel) {
+    branchSel.addEventListener("change", function(e) {
+      state.branch = e.target.value === "ALL" ? null : e.target.value;
+      state.agent = null;
+      render();
+    });
+  }
+
   // ---------- file upload / CSV parsing ----------
   function showUploadWarning(msg) {
     var w = document.getElementById("upload-warning");
