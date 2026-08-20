@@ -625,7 +625,7 @@
           <div class="mline-yaxis" id="mline-maintain-yaxis"></div>
           <div class="mline-scroll" id="mline-maintain-scroll">
             <div class="mline-plot" id="mline-maintain-plot">
-              <svg id="mline-maintain-svg" viewBox="0 0 600 380" preserveAspectRatio="none"></svg>
+              <svg id="mline-maintain-svg"></svg>
               <div class="mline-hitrow" id="mline-maintain-hitrow"></div>
               <div class="mline-crosshair" id="mline-maintain-crosshair"></div>
             </div>
@@ -641,7 +641,7 @@
           <div class="mline-yaxis" id="mline-pending-yaxis"></div>
           <div class="mline-scroll" id="mline-pending-scroll">
             <div class="mline-plot" id="mline-pending-plot">
-              <svg id="mline-pending-svg" viewBox="0 0 600 380" preserveAspectRatio="none"></svg>
+              <svg id="mline-pending-svg"></svg>
               <div class="mline-hitrow" id="mline-pending-hitrow"></div>
               <div class="mline-crosshair" id="mline-pending-crosshair"></div>
             </div>
@@ -661,7 +661,7 @@
           <div class="mline-yaxis" id="mline-combined-yaxis"></div>
           <div class="mline-scroll" id="mline-combined-scroll">
             <div class="mline-plot" id="mline-combined-plot">
-              <svg id="mline-combined-svg" viewBox="0 0 600 380" preserveAspectRatio="none"></svg>
+              <svg id="mline-combined-svg"></svg>
               <div class="mline-hitrow" id="mline-combined-hitrow"></div>
               <div class="mline-crosshair" id="mline-combined-crosshair"></div>
             </div>
@@ -724,7 +724,7 @@
         <div class="mline-yaxis" id="yoy-yaxis"></div>
         <div class="mline-scroll" id="yoy-scroll">
           <div class="mline-plot" id="yoy-plot">
-            <svg id="yoy-svg" viewBox="0 0 600 380" preserveAspectRatio="none"></svg>
+            <svg id="yoy-svg"></svg>
             <div class="mline-hitrow" id="yoy-hitrow"></div>
             <div class="mline-crosshair" id="yoy-crosshair"></div>
           </div>
@@ -2437,7 +2437,8 @@
       yAxisEl.appendChild(el("span", null, metric === "fee" ? fmt(Math.round(maxCount * f / 1000)) + "천" : fmt(Math.round(maxCount * f))));
     });
 
-    var W = 600, H = 380;
+    var W = plotEl.clientWidth || 600, H = plotEl.clientHeight || 260;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var padX = allMonths.length > 1 ? 24 : 300;
     var usableW = W - padX * 2;
     function xAt(i) { return allMonths.length > 1 ? padX + (i / (allMonths.length - 1)) * usableW : W / 2; }
@@ -2782,7 +2783,8 @@
     plotEl.style.minWidth = colMinW;
     axisXEl.style.minWidth = colMinW;
 
-    var W = 600, H = 380, padX = 24;
+    var W = plotEl.clientWidth || 600, H = plotEl.clientHeight || 260, padX = 24;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var usableW = W - padX * 2;
     function xAt(i) { return padX + (i / 11) * usableW; }
     function yAt(v) { return H / 2 - (v / axisMax) * (H / 2); }
@@ -2974,7 +2976,8 @@
     plotEl.style.minWidth = colMinW;
     axisXEl.style.minWidth = colMinW;
 
-    var W = 600, H = 380, padX = 24;
+    var W = plotEl.clientWidth || 600, H = plotEl.clientHeight || 260, padX = 24;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var usableW = W - padX * 2;
     function xAt(i) { return padX + (i / 11) * usableW; }
     function yAt(v) { return H - (v / maxVal) * H; }
