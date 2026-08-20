@@ -2519,6 +2519,7 @@
       projVals = smooth.forecasts;
     }
 
+    var reg = null;
     var seFn = null, projLower = [], projUpper = [];
     if (reg && xsFit.length >= 3) {
       var n = xsFit.length;
@@ -3311,7 +3312,8 @@
     
     // SVG Draw
     var rect = svg.getBoundingClientRect();
-    var w = rect.width, h = rect.height;
+    var w = rect.width || svg.clientWidth || 800, h = rect.height || svg.clientHeight || 400;
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
     
     // Axes
     var xAxis = svgEl("line"); xAxis.setAttribute("x1", 40); xAxis.setAttribute("y1", h-40); xAxis.setAttribute("x2", w-20); xAxis.setAttribute("y2", h-40); xAxis.setAttribute("stroke", "#cbd5e1"); svg.appendChild(xAxis);

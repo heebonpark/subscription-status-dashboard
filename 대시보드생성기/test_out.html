@@ -509,6 +509,28 @@
     </div>
 
     
+    <!-- AI Advanced EDA Cards -->
+    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+      <div class="card" style="flex: 1; min-width: 400px;">
+        <div class="card-head">
+          <h2 class="card-title">매출 기여도 (파레토 80/20 분석)</h2>
+          <p class="sub">상위 소수 영업자가 전체 월정료에 미치는 누적 기여율을 분석합니다.</p>
+        </div>
+        <div class="chart-wrap" style="height:350px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px;">
+          <svg id="pareto-svg" width="100%" height="100%"></svg>
+        </div>
+      </div>
+      <div class="card" style="flex: 1; min-width: 400px;">
+        <div class="card-head">
+          <h2 class="card-title">지표 간 상관관계 (Correlation Heatmap)</h2>
+          <p class="sub">월정료, 건수, 유지/취소율 간의 피어슨 상관계수(1에 가까울수록 비례) 매트릭스입니다.</p>
+        </div>
+        <div class="chart-wrap" style="height:350px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px;">
+          <svg id="corr-svg" width="100%" height="100%"></svg>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-head">
         <h2 class="card-title">AI 영업자 실적 군집 분석 (K-Means Clustering)</h2>
@@ -796,7 +818,7 @@
 (function () {
   "use strict";
 
-  var DEFAULT_DATA = {"records":[["A지사","B","C","2023-01-01","유지","123","상호명",1000,"추천","본부A"]]};
+  var DEFAULT_DATA = {"records":[["지사1","홍길동","A팀","2023-01-01","유지","1","상호1",10000,"","A본부"],["지사1","김철수","A팀","2023-01-02","청약","2","상호2",20000,"","A본부"],["지사2","이영희","B팀","2023-01-03","청약취소","3","상호3",30000,"","B본부"]]};
   var STATUSES = ["유지", "청약", "청약취소"];
   var STATUS_COLOR = { "유지": "var(--good)", "청약": "var(--warning)", "청약취소": "var(--critical)" };
   var STATUS_LABEL = { "유지": "유지", "청약": "청약(진행)", "청약취소": "취소/해지" };
@@ -1579,16 +1601,9 @@
     anomalyWrap.innerHTML = "";
     
     var branchAgg = aggregateByBranch(records);
-    var cancelRates = branchAgg.map(function(b) { return b.count ? (b.bucket["청약취소"].count / b.count * 100) : 0; });
-    var zScores = window.calculateZScores(cancelRates);
-    var anomalies = [];
-    zScores.forEach(function(z, idx) {
-      if(z > 2.0 && branchAgg[idx].count > 5) {
-        anomalies.push(shortBranch(branchAgg[idx].branch) + "(" + cancelRates[idx].toFixed(1) + "%)");
-      }
-    });
+    var anomalies = window.calculateMultivariateAnomalies(branchAgg);
     if (anomalies.length > 0) {
-      var alertDiv = el("div", null, "🚨 [AI 이상탐지] 취소율 비정상 급등 지사 발견: " + anomalies.join(", "));
+      var alertDiv = el("div", null, "🚨 [AI 다변량 이상탐지] 비정상 실적 패턴 지사 발견: " + anomalies.join(" | "));
       alertDiv.style.background = "rgba(239, 68, 68, 0.1)";
       alertDiv.style.border = "1px solid var(--critical)";
       alertDiv.style.color = "var(--critical)";
@@ -2497,9 +2512,14 @@
     var xsFit = [];
     for (var i = 0; i < completeCount; i++) { xsFit.push(Number(months[i].slice(5, 7))); }
     var fitVals = actualVals.slice(0, completeCount);
-    var reg = (projMonths.length && xsFit.length >= 2) ? linearRegression(xsFit, fitVals) : null;
-    var projVals = reg ? projMonths.map(function (ym) { return Math.max(0, reg.predict(Number(ym.slice(5, 7)))); }) : [];
+    // Exponential Smoothing (AI-lite time series)
+    var projVals = [];
+    if(projMonths.length && xsFit.length >= 2) {
+      var smooth = window.exponentialSmoothing(fitVals, 0.5, 0.3, projMonths.length);
+      projVals = smooth.forecasts;
+    }
 
+    var reg = null;
     var seFn = null, projLower = [], projUpper = [];
     if (reg && xsFit.length >= 3) {
       var n = xsFit.length;
@@ -2712,7 +2732,7 @@
 
     projNoteEl.innerHTML = "";
     if (hasProjection) {
-      var line1 = "점선 구간(" + trendBucketLabel(projMonths[0], "month", monthMultiYear) + "~" + trendBucketLabel(projMonths[projMonths.length - 1], "month", monthMultiYear) + ")은 완료된 " + completeCount + "개월의 선형회귀 추세를 연장한 예측치입니다.";
+      var line1 = "점선 구간(" + trendBucketLabel(projMonths[0], "month", monthMultiYear) + "~" + trendBucketLabel(projMonths[projMonths.length - 1], "month", monthMultiYear) + ")은 완료된 " + completeCount + "개월 실적에 지수평활(Exponential Smoothing) AI 알고리즘을 적용한 미래 예측치입니다.";
       if (ciOn) line1 += " 음영은 80% 신뢰구간으로, 미래로 갈수록 불확실성이 커져 범위가 넓어집니다.";
       projNoteEl.appendChild(el("div", null, line1));
     }
@@ -3323,6 +3343,7 @@
 
   function renderTable(records) {
     var rows = computeAgentRows(records);
+    if(window.calculateAgentRFM) window.calculateAgentRFM(rows);
     if (state.search) {
       var q = state.search.toLowerCase();
       rows = rows.filter(function (r) { return r.agent.toLowerCase().indexOf(q) !== -1; });
@@ -3498,6 +3519,240 @@
     }
     return clusters;
   };
+
+  // ----------------------------------------------------
+  // EXPERT EDA & AI/ML ALGORITHMS
+  // ----------------------------------------------------
+
+  // 1. Multivariate Anomaly Detection (Pseudo-Mahalanobis)
+  window.calculateMultivariateAnomalies = function(branches) {
+    if(branches.length < 3) return [];
+    var pre = branches.map(function(b) {
+      var c = b.conv;
+      if (c === undefined && b.bucket) {
+         var d = b.bucket["유지"].count + b.bucket["청약취소"].count;
+         c = d > 0 ? (b.bucket["유지"].count / d * 100) : 50;
+      }
+      return { branch: b.branch, count: b.count || b.total || 0, fee: b.fee || 0, conv: c || 50 };
+    });
+    var mean = function(arr) { return arr.reduce(function(a,b){return a+b},0)/arr.length; };
+    var std = function(arr, m) { return Math.sqrt(arr.reduce(function(a,b){return a+Math.pow(b-m,2)},0)/arr.length) || 1; };
+    var counts = pre.map(function(b){return b.count});
+    var fees = pre.map(function(b){return b.fee});
+    var convs = pre.map(function(b){return b.conv});
+    branches = pre;
+    
+    var mCount = mean(counts), sCount = std(counts, mCount);
+    var mFee = mean(fees), sFee = std(fees, mFee);
+    var mConv = mean(convs), sConv = std(convs, mConv);
+    
+    var anomalies = [];
+    branches.forEach(function(b) {
+      if(b.count < 3) return;
+      var zCount = (b.count - mCount) / sCount;
+      var zFee = (b.fee - mFee) / sFee;
+      var zConv = (b.conv - mConv) / sConv;
+      var dist = Math.sqrt(zCount*zCount + zFee*zFee + zConv*zConv);
+      
+      if(dist > 2.5) {
+        var reasons = [];
+        if(zCount < -1.5) reasons.push("건수 급감");
+        if(zCount > 2.0) reasons.push("건수 폭증");
+        if(zFee < -1.5) reasons.push("월정료 저조");
+        if(zFee > 2.0) reasons.push("월정료 폭증");
+        if(zConv < -2.0) reasons.push("유지율 치명적 하락");
+        if(reasons.length > 0) anomalies.push(shortBranch(b.branch) + " (" + reasons.join(", ") + ")");
+      }
+    });
+    return anomalies;
+  };
+
+  // 2. Exponential Smoothing (Holt-Winters Lite for Time Series Forecasting)
+  window.exponentialSmoothing = function(data, alpha, beta, horizon) {
+    if(data.length < 2) return [];
+    var level = data[0], trend = data[1] - data[0];
+    var smoothed = [level];
+    for(var i=1; i<data.length; i++) {
+      var lastLevel = level;
+      level = alpha * data[i] + (1 - alpha) * (lastLevel + trend);
+      trend = beta * (level - lastLevel) + (1 - beta) * trend;
+      smoothed.push(level);
+    }
+    var forecasts = [];
+    for(var j=1; j<=horizon; j++) {
+      forecasts.push(Math.max(0, level + j * trend));
+    }
+    return { smoothed: smoothed, forecasts: forecasts };
+  };
+
+  // 3. RFM Agent Scoring Model
+  window.calculateAgentRFM = function(agents) {
+    if(agents.length === 0) return;
+    var maxCount = Math.max.apply(null, agents.map(function(a){return a.total || a.count || 0})) || 1;
+    var maxFee = Math.max.apply(null, agents.map(function(a){return a.fee || 0})) || 1;
+    
+    agents.forEach(function(a) {
+      // Frequency Score (0-100)
+      var fScore = ((a.total || a.count || 0) / maxCount) * 100;
+      // Monetary Score (0-100)
+      var mScore = (a.fee / maxFee) * 100;
+      // Recency / Conversion quality Score (0-100)
+      var rScore = a.conv !== null ? a.conv : 50; 
+      
+      // AI Weighted Score
+      a.aiScore = (fScore * 0.4) + (mScore * 0.4) + (rScore * 0.2);
+      
+      if(a.aiScore >= 80) a.aiTier = "Platinum";
+      else if(a.aiScore >= 50) a.aiTier = "Gold";
+      else if(a.aiScore >= 25) a.aiTier = "Silver";
+      else a.aiTier = "Risk";
+    });
+  };
+
+  // 4. Pareto (80/20) Chart Rendering
+  window.renderParetoChart = function(records) {
+    var wrap = document.getElementById("pareto-svg");
+    if(!wrap) return;
+    wrap.innerHTML = "";
+    
+    var agents = agentPerfRows(records).filter(function(a){return a.fee > 0});
+    if(agents.length === 0) {
+      wrap.innerHTML = "<text x=\"50%\" y=\"50%\" text-anchor=\"middle\" fill=\"#94a3b8\">표시할 수익 데이터가 없습니다.</text>";
+      return;
+    }
+    
+    agents.sort(function(a,b){return b.fee - a.fee});
+    var totalFee = agents.reduce(function(s, a){return s + a.fee}, 0);
+    var cumul = 0;
+    
+    var rectInfo = wrap.getBoundingClientRect();
+    var w = rectInfo.width || wrap.clientWidth || 800;
+    var h = rectInfo.height || wrap.clientHeight || 350;
+    wrap.setAttribute("viewBox", "0 0 " + w + " " + h);
+    var pad = 40;
+    
+    // Axis
+    var xAxis = svgEl("line", {x1:pad, y1:h-pad, x2:w-pad, y2:h-pad, stroke:"#cbd5e1"});
+    var yAxisL = svgEl("line", {x1:pad, y1:pad, x2:pad, y2:h-pad, stroke:"#cbd5e1"});
+    var yAxisR = svgEl("line", {x1:w-pad, y1:pad, x2:w-pad, y2:h-pad, stroke:"#cbd5e1"});
+    wrap.appendChild(xAxis); wrap.appendChild(yAxisL); wrap.appendChild(yAxisR);
+    
+    var topN = Math.min(agents.length, 50); // Show top 50
+    var barW = (w - pad*2) / topN;
+    var maxBar = agents[0].fee;
+    
+    var linePts = [];
+    
+    agents.slice(0, topN).forEach(function(a, i) {
+      var x = pad + i*barW + barW/2;
+      var barH = (a.fee / maxBar) * (h - pad*2);
+      var rect = svgEl("rect", {
+        x: x - barW*0.4, y: h - pad - barH, width: barW*0.8, height: barH,
+        fill: "var(--rank-bar)", rx: 2
+      });
+      var tt = svgEl("title"); tt.textContent = a.agent + " (" + fmtFee(a.fee) + ")";
+      rect.appendChild(tt);
+      wrap.appendChild(rect);
+      
+      cumul += a.fee;
+      var pct = cumul / totalFee;
+      var ly = h - pad - (pct * (h - pad*2));
+      linePts.push(x + "," + ly);
+      
+      var dot = svgEl("circle", {cx: x, cy: ly, r: 3, fill: "var(--critical)"});
+      wrap.appendChild(dot);
+    });
+    
+    var polyline = svgEl("polyline", {
+      points: linePts.join(" "), fill: "none", stroke: "var(--critical)", "stroke-width": 2
+    });
+    wrap.appendChild(polyline);
+    
+    // 80% line
+    var y80 = h - pad - (0.8 * (h - pad*2));
+    var line80 = svgEl("line", {x1:pad, y1:y80, x2:w-pad, y2:y80, stroke:"#94a3b8", "stroke-dasharray":"4,4"});
+    wrap.appendChild(line80);
+    var t80 = svgEl("text", {x:w-pad+5, y:y80+4, "font-size":10, fill:"#64748b"}); t80.textContent="80%";
+    wrap.appendChild(t80);
+  };
+
+  // 5. Correlation Heatmap Rendering
+  window.renderCorrelationHeatmap = function(records) {
+    var wrap = document.getElementById("corr-svg");
+    if(!wrap) return;
+    wrap.innerHTML = "";
+    
+    var branches = aggregateByBranch(records).filter(function(b){return b.count > 0});
+    if(branches.length < 3) {
+      wrap.innerHTML = "<text x=\"50%\" y=\"50%\" text-anchor=\"middle\" fill=\"#94a3b8\">데이터가 부족합니다.</text>";
+      return;
+    }
+    
+    var vars = ["총건수", "총월정료", "유지건수", "취소율"];
+    var dataMatrix = branches.map(function(b) {
+      var cancelRate = b.bucket["청약취소"].count / b.count * 100;
+      return [b.count, b.fee, b.bucket["유지"].count, cancelRate];
+    });
+    
+    var mean = function(arr) { return arr.reduce(function(a,b){return a+b},0)/arr.length; };
+    var std = function(arr, m) { return Math.sqrt(arr.reduce(function(a,b){return a+Math.pow(b-m,2)},0)/arr.length) || 1; };
+    var corr = function(x, y) {
+      var mx = mean(x), my = mean(y), sx = std(x, mx), sy = std(y, my);
+      if(sx === 0 || sy === 0) return 0; // Prevent NaN if variance is 0
+      var cov = 0;
+      for(var i=0; i<x.length; i++) cov += (x[i]-mx)*(y[i]-my);
+      return (cov / x.length) / (sx * sy);
+    };
+    
+    var cols = vars.map(function(_, i){ return dataMatrix.map(function(row){return row[i]}) });
+    var matrix = [];
+    for(var i=0; i<4; i++) {
+      matrix[i] = [];
+      for(var j=0; j<4; j++) {
+        matrix[i][j] = corr(cols[i], cols[j]);
+      }
+    }
+    
+    var rectInfo = wrap.getBoundingClientRect();
+    var w = rectInfo.width || wrap.clientWidth || 400, h = rectInfo.height || wrap.clientHeight || 350;
+    wrap.setAttribute("viewBox", "0 0 " + w + " " + h);
+    var pad = 40, cellW = (w-pad*2)/4, cellH = (h-pad*2)/4;
+    
+    vars.forEach(function(v, i) {
+      var tx = svgEl("text", {x: pad + i*cellW + cellW/2, y: pad-10, "text-anchor":"middle", "font-size":11, fill:"#64748b"});
+      tx.textContent = v; wrap.appendChild(tx);
+      var ty = svgEl("text", {x: pad-10, y: pad + i*cellH + cellH/2 + 4, "text-anchor":"end", "font-size":11, fill:"#64748b"});
+      ty.textContent = v; wrap.appendChild(ty);
+    });
+    
+    for(var i=0; i<4; i++) {
+      for(var j=0; j<4; j++) {
+        var val = isNaN(matrix[i][j]) ? 0 : matrix[i][j];
+        // Map -1..1 to HSL (Blue for +1, Red for -1)
+        var hue = val > 0 ? 220 : 0; // Blue or Red
+        var sat = Math.abs(val) * 100;
+        var light = 100 - Math.abs(val) * 50; // 100(white) to 50(color)
+        var color = "hsl(" + hue + ", " + sat + "%, " + light + "%)";
+        
+        var rect = svgEl("rect", {
+          x: pad + j*cellW, y: pad + i*cellH, width: cellW, height: cellH,
+          fill: color, stroke: "#fff", "stroke-width": 1
+        });
+        var tt = svgEl("title"); tt.textContent = val.toFixed(2);
+        rect.appendChild(tt);
+        wrap.appendChild(rect);
+        
+        var tVal = svgEl("text", {
+          x: pad + j*cellW + cellW/2, y: pad + i*cellH + cellH/2 + 4,
+          "text-anchor":"middle", "font-size":11, "font-weight":600,
+          fill: Math.abs(val) > 0.5 ? "#fff" : "#475569"
+        });
+        tVal.textContent = val.toFixed(2);
+        wrap.appendChild(tVal);
+      }
+    }
+  };
+
   // ----------------------
 
   function render() {
@@ -3524,6 +3779,9 @@
     renderMonthlyAnalysis(full);
     renderYoyChart(branchAgentRecords());
     renderTable(bdRecs);
+    renderClusters(bdRecs);
+    if(window.renderParetoChart) window.renderParetoChart(bdRecs);
+    if(window.renderCorrelationHeatmap) window.renderCorrelationHeatmap(bdRecs);
   }
 
   // ---------- init ----------
