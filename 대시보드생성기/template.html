@@ -494,6 +494,55 @@
       </div>
     </div>
 
+    <div class="card" id="pipeline-card">
+      <div class="card-head">
+        <h2 class="card-title">신규 파이프라인 현황 (수기 입력)</h2>
+        <p class="sub">진행중인 영업 파이프라인(예상 건수·월정료)을 지사·담당자별로 직접 등록해 추적합니다.</p>
+      </div>
+      <p class="sub" style="color:var(--warning); font-weight:600;">⚠️ 이 입력값은 현재 이 브라우저(이 PC)에만 저장됩니다. 다른 사용자와 실시간으로 공유되지 않으니 참고해 주세요.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin:14px 0;">
+        <div>
+          <div class="flabel" style="margin-bottom:4px;">지사</div>
+          <select class="sel" id="pipe-branch" style="width:140px;">
+            <option value="">지사 선택</option>
+          </select>
+        </div>
+        <div>
+          <div class="flabel" style="margin-bottom:4px;">담당자</div>
+          <select class="sel" id="pipe-agent-select" style="width:130px;">
+            <option value="">지사를 먼저 선택하세요</option>
+          </select>
+          <input type="text" class="sel" id="pipe-agent-new" placeholder="신규 담당자명" style="width:110px; display:none; margin-top:4px;">
+        </div>
+        <div>
+          <div class="flabel" style="margin-bottom:4px;">예상 건수</div>
+          <input type="number" class="sel" id="pipe-count" min="0" step="1" style="width:90px;">
+        </div>
+        <div>
+          <div class="flabel" style="margin-bottom:4px;">예상 월정료(원)</div>
+          <input type="number" class="sel" id="pipe-fee" min="0" step="1000" style="width:130px;">
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <div class="flabel" style="margin-bottom:4px;">메모</div>
+          <input type="text" class="sel" id="pipe-memo" placeholder="선택 입력" style="width:100%;">
+        </div>
+        <button class="reset-btn" id="pipe-add-btn" style="background:var(--primary); color:#fff; border:none; padding:7px 16px; height:34px;">+ 등록</button>
+      </div>
+      <p class="sub" id="pipe-error" style="color:var(--critical); display:none;"></p>
+      <div class="kpis" id="pipeline-kpis" style="margin-bottom:14px;"></div>
+      <div class="table-scroll">
+        <table class="data" id="pipeline-table">
+          <thead>
+            <tr>
+              <th>지사</th><th>담당자</th><th>예상 건수</th><th>예상 월정료</th><th>메모</th><th>등록일시</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pipeline-tbody"></tbody>
+        </table>
+      </div>
+      <div id="pipeline-toggle-wrap" style="margin-top:10px; display:none;"></div>
+    </div>
+
     <div class="filters" id="option-bar">
       <span class="flabel">표시 옵션 · 기준지표</span>
       <div class="toggle-group" id="metric-toggle">
@@ -532,10 +581,17 @@
     </div>
 
     <div class="card">
-      <div class="card-head">
-        <h2 class="card-title">AI 영업자 실적 군집 분석 (K-Means Clustering)</h2>
-        <p class="sub">수많은 영업자를 실적 패턴(건수, 유지전환율, 월정료)에 따라 AI가 자동 그룹화합니다.</p>
+      <div class="card-head" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h2 class="card-title">AI 영업자 실적 군집 분석 (K-Means Clustering)</h2>
+          <p class="sub" id="cluster-sub">수많은 영업자를 실적 패턴(건수, 유지전환율, 월정료)에 따라 AI가 자동 그룹화합니다.</p>
+        </div>
+        <select class="sel" id="cluster-color-mode" style="width:170px; font-size:12px;">
+          <option value="kmeans" selected>색상: K-Means 군집</option>
+          <option value="rfm">색상: AI RFM 등급</option>
+        </select>
       </div>
+      <div class="legend" id="legend-cluster"></div>
       <div class="chart-wrap" style="height:400px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px;">
         <svg id="cluster-svg" width="100%" height="100%"></svg>
       </div>
@@ -574,6 +630,7 @@
               <th data-key="cancelRate">취소율</th>
               <th data-key="conv">전환율</th>
               <th data-key="conv">평가</th>
+              <th>취소율 추이</th>
             </tr>
           </thead>
           <tbody id="branch-summary-tbody"></tbody>
@@ -585,6 +642,28 @@
       <h2>TOP <span id="topn-label">10</span> 영업자</h2>
       <p class="sub" id="top10-sub"></p>
       <div id="top10-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>추천자별 실적 요약</h2>
+      <p class="sub" id="referrer-summary-sub">추천자명 기준 건수·월정료·유지전환율입니다 (상위 15명).</p>
+      <div class="table-scroll">
+        <table class="data rank-label" id="referrer-table">
+          <thead>
+            <tr>
+              <th style="width:32px;"></th>
+              <th>추천자</th>
+              <th>총건수</th>
+              <th>총월정료</th>
+              <th>유지</th>
+              <th>청약</th>
+              <th>취소</th>
+              <th>전환율</th>
+            </tr>
+          </thead>
+          <tbody id="referrer-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
@@ -635,6 +714,13 @@
         <div class="colchart" id="date-chart"></div>
         <div class="col-axis" id="date-axis"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>요일별 청약 패턴</h2>
+      <p class="sub" id="weekday-heatmap-sub"></p>
+      <div class="legend" id="legend-weekday"></div>
+      <div id="weekday-heatmap" style="display:flex; gap:6px;"></div>
     </div>
 
     <div class="card">
@@ -809,6 +895,7 @@
               <th data-key="cancelRate">취소율</th>
               <th data-key="conv">전환율</th>
               <th data-key="conv">평가</th>
+              <th data-key="aiScore">AI등급</th>
             </tr>
           </thead>
           <tbody id="agent-tbody"></tbody>
@@ -831,7 +918,7 @@
   var REQUIRED_COLS = ["영업지사명", "영업자명", "영업자소속", "청약일자", "계약상태(중)", "계약번호", "상호", "KTT월정료"];
   var PLACEHOLDER_AGENT = "추천자와동일";
 
-  var RECORDS, ALL_HQS, ALL_BRANCHES, ALL_DATES;
+  var RECORDS, ALL_HQS, ALL_BRANCHES, ALL_DATES, BRANCH_HQ_MAP;
 
   var state = {
     hq: null, branch: null, agent: null,
@@ -844,7 +931,7 @@
     showMA: true, showCI: true, showOutliers: true,
     yoyMetric: "count", yoyYears: null, yoyMode: "raw",
     excludeCancelled: false, excludePlaceholder: false,
-    summaryOpen: false, agentListOpen: false,
+    summaryOpen: false, agentListOpen: false, pipelineOpen: false,
     goal: { count: null, fee: null }
   };
 
@@ -891,13 +978,16 @@
     var map = {};
     records.forEach(function (r) {
       if (!map[r[0]]) {
-         map[r[0]] = emptyBucket();
-         map[r[0]].hq = r[hqIdx] || "기타본부";
+         map[r[0]] = { hq: r[9] || "기타본부", bucket: emptyBucket(), monthly: {} };
       }
-      addToBucket(map[r[0]], r);
+      addToBucket(map[r[0]].bucket, r);
+      var ym = r[3].slice(0, 7);
+      if (!map[r[0]].monthly[ym]) map[r[0]].monthly[ym] = emptyBucket();
+      addToBucket(map[r[0]].monthly[ym], r);
     });
     return Object.keys(map).map(function (b) {
-      return { branch: b, hq: map[b].hq, bucket: map[b], count: bucketTotal(map[b], "count"), fee: bucketTotal(map[b], "fee") };
+      var m = map[b];
+      return { branch: b, hq: m.hq, bucket: m.bucket, monthly: m.monthly, count: bucketTotal(m.bucket, "count"), fee: bucketTotal(m.bucket, "fee") };
     });
   }
 
@@ -993,6 +1083,8 @@
     ALL_HQS = computeHqList(RECORDS);
     ALL_BRANCHES = computeBranchOrder(RECORDS);
     ALL_DATES = computeDateList(RECORDS);
+    BRANCH_HQ_MAP = {};
+    RECORDS.forEach(function (r) { if (!BRANCH_HQ_MAP[r[0]]) BRANCH_HQ_MAP[r[0]] = r[9] || null; });
     var span = ALL_DATES.length ? daysBetween(ALL_DATES[0], ALL_DATES[ALL_DATES.length - 1]) : 0;
     state.trendGranularity = span > 400 ? "year" : (span > 45 ? "month" : "day");
     document.querySelectorAll("#trend-granularity button").forEach(function (b) {
@@ -1223,19 +1315,15 @@
   dateFromInput.addEventListener("change", handleRangeChange);
   dateToInput.addEventListener("change", handleRangeChange);
 
-  if (daySel) {
-    daySel.addEventListener("change", function(e) {
-      state.dateTo = e.target.value === "ALL" ? null : e.target.value;
-      render();
-    });
-  }
-
   var branchGroupMode = document.getElementById("branch-group-mode");
   if (branchGroupMode) {
     branchGroupMode.addEventListener("change", function() { render(); });
   }
 
-  var topNSel = document.getElementById("topn-sel");
+  var clusterColorMode = document.getElementById("cluster-color-mode");
+  if (clusterColorMode) {
+    clusterColorMode.addEventListener("change", function() { render(); });
+  }
 
   function resetAllFilters() {
     state.hq = null; state.branch = null; state.agent = null;
@@ -2124,6 +2212,290 @@
     }
   }
 
+  // ---------- weekday pattern heatmap ----------
+  var WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+  function renderWeekdayHeatmap(records) {
+    var wrap = document.getElementById("weekday-heatmap");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    document.getElementById("weekday-heatmap-sub").textContent =
+      "요일별 " + (state.metric === "fee" ? "월정료" : "청약") + " 규모입니다. 색이 진할수록 물량이 많은 요일입니다.";
+    if (records.length === 0) { wrap.appendChild(el("p", "sub", "표시할 데이터가 없습니다.")); return; }
+
+    var buckets = WEEKDAY_LABELS.map(function () { return emptyBucket(); });
+    records.forEach(function (r) {
+      var d = new Date(r[3] + "T00:00:00");
+      var idx = (d.getDay() + 6) % 7; // Mon=0 ... Sun=6
+      addToBucket(buckets[idx], r);
+    });
+    var totals = buckets.map(function (b) { return bucketTotal(b, state.metric); });
+    var maxV = Math.max.apply(null, totals) || 1;
+
+    WEEKDAY_LABELS.forEach(function (lb, i) {
+      var v = totals[i];
+      var intensity = v / maxV;
+      var cell = el("div", null);
+      cell.style.cssText = "flex:1; min-width:60px; text-align:center; padding:10px 4px; border-radius:8px;";
+      cell.style.background = "rgba(99,102,241," + (0.06 + intensity * 0.34) + ")";
+
+      var lbEl = el("div", null, lb);
+      lbEl.style.cssText = "font-size:12.5px; color:var(--text-secondary); margin-bottom:4px;";
+      cell.appendChild(lbEl);
+
+      var valEl = el("div", null, fmtMetric(v, state.metric));
+      valEl.style.cssText = "font-size:14px; font-weight:650; color:var(--text-primary); margin-bottom:8px;";
+      cell.appendChild(valEl);
+
+      var track = el("div", "bartrack");
+      track.style.height = "10px";
+      STATUSES.forEach(function (s) {
+        var sv = buckets[i][s][state.metric];
+        if (sv <= 0) return;
+        var seg = el("div", "seg");
+        seg.style.background = STATUS_COLOR[s];
+        seg.style.flex = sv;
+        seg.style.height = "10px";
+        var ttRows = STATUSES.map(function (st) { return { status: st, value: buckets[i][st][state.metric] }; });
+        var title = lb + "요일 · 총 " + fmtMetric(v, state.metric);
+        seg.addEventListener("pointermove", function (evt) { showTooltip(evt, title, ttRows, s, state.metric); });
+        seg.addEventListener("pointerleave", hideTooltip);
+        track.appendChild(seg);
+      });
+      cell.appendChild(track);
+      wrap.appendChild(cell);
+    });
+  }
+
+  // ---------- referrer summary ----------
+  function renderReferrerSummary(records) {
+    var tbody = document.getElementById("referrer-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    var rows = aggregateByReferrer(records).map(function (agg) {
+      var row = toSummaryRow(agg);
+      row.referrer = agg.referrer;
+      return row;
+    }).sort(function (a, b) { return b.total - a.total; }).slice(0, 15);
+
+    if (rows.length === 0) {
+      var tr0 = el("tr", "empty-row");
+      var td0 = el("td", null, "표시할 데이터가 없습니다.");
+      td0.colSpan = 8;
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+      return;
+    }
+    rows.forEach(function (r, idx) {
+      var tr = document.createElement("tr");
+      var tdRank = document.createElement("td");
+      tdRank.appendChild(el("span", "rank", String(idx + 1)));
+      tr.appendChild(tdRank);
+      tr.appendChild(el("td", null, r.referrer));
+      tr.appendChild(el("td", null, fmt(r.total)));
+      tr.appendChild(el("td", null, fmtFee(r.fee)));
+      tr.appendChild(el("td", null, fmt(r.maintainCount)));
+      tr.appendChild(el("td", null, fmt(r.pendingCount)));
+      tr.appendChild(el("td", null, fmt(r.cancelCount)));
+      var tdConv = el("td", perfClass(r.conv), r.conv === null ? "–" : r.conv.toFixed(1) + "%");
+      tr.appendChild(tdConv);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---------- new pipeline (manual entry, local browser only) ----------
+  var PIPELINE_KEY = "subdash_pipeline_v1";
+  function loadPipeline() {
+    try { return JSON.parse(localStorage.getItem(PIPELINE_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function savePipeline() {
+    try { localStorage.setItem(PIPELINE_KEY, JSON.stringify(PIPELINE_ENTRIES)); } catch (e) {}
+  }
+  var PIPELINE_ENTRIES = loadPipeline();
+  var PIPELINE_COLLAPSE_LIMIT = 8;
+  var PIPE_NEW_AGENT = "__new__";
+
+  function pipeBranchOptions() {
+    var branches = ALL_BRANCHES || [];
+    if (state.hq) {
+      branches = branches.filter(function (b) { return BRANCH_HQ_MAP[b] === state.hq; });
+    }
+    return branches;
+  }
+
+  function updatePipeAgentOptions() {
+    var branchSelEl = document.getElementById("pipe-branch");
+    var agentSelEl = document.getElementById("pipe-agent-select");
+    if (!branchSelEl || !agentSelEl) return;
+    var branch = branchSelEl.value;
+    var prevVal = agentSelEl.value;
+
+    var agentSet = {};
+    if (branch) {
+      RECORDS.forEach(function (r) { if (r[0] === branch) agentSet[r[1]] = true; });
+    }
+    var agentNames = Object.keys(agentSet).sort(function (a, b) { return a.localeCompare(b, "ko"); });
+
+    agentSelEl.innerHTML = "";
+    var opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = branch ? "담당자 선택" : "지사를 먼저 선택하세요";
+    agentSelEl.appendChild(opt0);
+    agentNames.forEach(function (a) {
+      var o = document.createElement("option");
+      o.value = a; o.textContent = a;
+      agentSelEl.appendChild(o);
+    });
+    var optNew = document.createElement("option");
+    optNew.value = PIPE_NEW_AGENT;
+    optNew.textContent = "+ 신규 담당자 직접입력";
+    agentSelEl.appendChild(optNew);
+
+    var validVals = [""].concat(agentNames, [PIPE_NEW_AGENT]);
+    agentSelEl.value = validVals.indexOf(prevVal) !== -1 ? prevVal : "";
+    togglePipeAgentNewInput();
+  }
+
+  function togglePipeAgentNewInput() {
+    var agentSelEl = document.getElementById("pipe-agent-select");
+    var newInput = document.getElementById("pipe-agent-new");
+    if (!agentSelEl || !newInput) return;
+    newInput.style.display = agentSelEl.value === PIPE_NEW_AGENT ? "" : "none";
+  }
+
+  function renderPipeline() {
+    var branchSelEl = document.getElementById("pipe-branch");
+    if (branchSelEl) {
+      var prevBranchVal = branchSelEl.value;
+      var branchOptions = pipeBranchOptions();
+      branchSelEl.innerHTML = "";
+      var opt0 = document.createElement("option");
+      opt0.value = ""; opt0.textContent = "지사 선택";
+      branchSelEl.appendChild(opt0);
+      branchOptions.forEach(function (b) {
+        var o = document.createElement("option");
+        o.value = b; o.textContent = shortBranch(b);
+        branchSelEl.appendChild(o);
+      });
+      branchSelEl.value = branchOptions.indexOf(prevBranchVal) !== -1 ? prevBranchVal : "";
+    }
+    updatePipeAgentOptions();
+
+    var scoped = PIPELINE_ENTRIES.filter(function (p) {
+      if (state.hq && (BRANCH_HQ_MAP[p.branch] || null) !== state.hq) return false;
+      if (state.branch && p.branch !== state.branch) return false;
+      return true;
+    }).sort(function (a, b) { return b.createdAt.localeCompare(a.createdAt); });
+
+    var totalCount = scoped.reduce(function (s, p) { return s + p.count; }, 0);
+    var totalFee = scoped.reduce(function (s, p) { return s + p.fee; }, 0);
+    var kpiWrap = document.getElementById("pipeline-kpis");
+    if (kpiWrap) {
+      kpiWrap.innerHTML = "";
+      [
+        { label: "등록 건수", value: fmt(scoped.length) + "건" },
+        { label: "파이프라인 예상 건수", value: fmt(totalCount) + "건" },
+        { label: "파이프라인 예상 월정료", value: fmtFee(totalFee) }
+      ].forEach(function (t) {
+        var tile = el("div", "tile");
+        tile.appendChild(el("div", "tlabel", t.label));
+        tile.appendChild(el("div", "tvalue", t.value));
+        kpiWrap.appendChild(tile);
+      });
+    }
+
+    var tbody = document.getElementById("pipeline-tbody");
+    var toggleWrap = document.getElementById("pipeline-toggle-wrap");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (toggleWrap) toggleWrap.innerHTML = "";
+    if (scoped.length === 0) {
+      var tr0 = el("tr", "empty-row");
+      var td0 = el("td", null, "등록된 파이프라인이 없습니다.");
+      td0.colSpan = 7;
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+      if (toggleWrap) toggleWrap.style.display = "none";
+      return;
+    }
+
+    var showCount = state.pipelineOpen ? scoped.length : Math.min(PIPELINE_COLLAPSE_LIMIT, scoped.length);
+    scoped.slice(0, showCount).forEach(function (p) {
+      var tr = document.createElement("tr");
+      tr.appendChild(el("td", null, shortBranch(p.branch)));
+      tr.appendChild(el("td", null, p.agent));
+      tr.appendChild(el("td", null, fmt(p.count)));
+      tr.appendChild(el("td", null, fmtFee(p.fee)));
+      tr.appendChild(el("td", null, p.memo || ""));
+      tr.appendChild(el("td", null, p.createdAt.replace("T", " ").slice(0, 16)));
+      var tdDel = document.createElement("td");
+      var delBtn = el("button", "reset-btn", "삭제");
+      delBtn.style.cssText = "padding:3px 8px; font-size:11px;";
+      delBtn.addEventListener("click", function () {
+        PIPELINE_ENTRIES = PIPELINE_ENTRIES.filter(function (x) { return x.id !== p.id; });
+        savePipeline();
+        renderPipeline();
+      });
+      tdDel.appendChild(delBtn);
+      tr.appendChild(tdDel);
+      tbody.appendChild(tr);
+    });
+
+    if (toggleWrap) {
+      if (scoped.length > PIPELINE_COLLAPSE_LIMIT) {
+        toggleWrap.style.display = "";
+        var toggleBtn = el("button", "reset-btn",
+          state.pipelineOpen ? "접기" : ("더보기 (" + (scoped.length - PIPELINE_COLLAPSE_LIMIT) + ")"));
+        toggleBtn.addEventListener("click", function () { state.pipelineOpen = !state.pipelineOpen; renderPipeline(); });
+        toggleWrap.appendChild(toggleBtn);
+      } else {
+        toggleWrap.style.display = "none";
+      }
+    }
+  }
+
+  var pipeBranchSel = document.getElementById("pipe-branch");
+  if (pipeBranchSel) pipeBranchSel.addEventListener("change", updatePipeAgentOptions);
+  var pipeAgentSel = document.getElementById("pipe-agent-select");
+  if (pipeAgentSel) pipeAgentSel.addEventListener("change", togglePipeAgentNewInput);
+
+  var pipeAddBtn = document.getElementById("pipe-add-btn");
+  if (pipeAddBtn) {
+    pipeAddBtn.addEventListener("click", function () {
+      var branchInput = document.getElementById("pipe-branch");
+      var agentSelEl = document.getElementById("pipe-agent-select");
+      var agentNewInput = document.getElementById("pipe-agent-new");
+      var countInput = document.getElementById("pipe-count");
+      var feeInput = document.getElementById("pipe-fee");
+      var memoInput = document.getElementById("pipe-memo");
+      var errEl = document.getElementById("pipe-error");
+
+      var branch = branchInput.value;
+      var agent = agentSelEl.value === PIPE_NEW_AGENT ? agentNewInput.value.trim() : agentSelEl.value;
+      var count = Number(countInput.value);
+      var fee = Number(feeInput.value);
+      var memo = memoInput.value.trim();
+
+      var valid = branch && agent && countInput.value !== "" && feeInput.value !== "" &&
+        isFinite(count) && count >= 0 && isFinite(fee) && fee >= 0;
+      if (!valid) {
+        errEl.textContent = "지사·담당자를 선택(또는 입력)하고 건수·월정료를 0 이상 숫자로 입력해 주세요.";
+        errEl.style.display = "";
+        return;
+      }
+      errEl.style.display = "none";
+
+      PIPELINE_ENTRIES.push({
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        branch: branch, agent: agent, count: count, fee: fee, memo: memo,
+        createdAt: new Date().toISOString()
+      });
+      savePipeline();
+      agentSelEl.value = ""; agentNewInput.value = ""; agentNewInput.style.display = "none";
+      countInput.value = ""; feeInput.value = ""; memoInput.value = "";
+      renderPipeline();
+    });
+  }
+
   // ---------- TOP N leaderboard ----------
   function renderTop10(records) {
     var rows = aggregateByAgent(records).sort(function (a, b) { return b[state.metric] - a[state.metric]; });
@@ -2253,6 +2625,13 @@
     if (conv >= 70) return "🟡 보통";
     return "🔴 관리필요";
   }
+  function aiTierBadge(tier) {
+    if (tier === "Platinum") return "💎 Platinum";
+    if (tier === "Gold") return "🥇 Gold";
+    if (tier === "Silver") return "🥈 Silver";
+    if (tier === "Risk") return "⚠️ Risk";
+    return "–";
+  }
   function toSummaryRow(agg) {
     var m = agg.bucket["유지"], p = agg.bucket["청약"], c = agg.bucket["청약취소"];
     var denom = m.count + c.count;
@@ -2263,7 +2642,8 @@
       pendingCount: p.count, pendingFee: p.fee,
       cancelCount: c.count, cancelFee: c.fee,
       cancelRate: agg.count ? (c.count / agg.count * 100) : 0,
-      conv: denom > 0 ? (m.count / denom * 100) : null
+      conv: denom > 0 ? (m.count / denom * 100) : null,
+      monthly: agg.monthly
     };
     return out;
   }
@@ -3356,53 +3736,118 @@
     tr.appendChild(el("td", "badge-cell", perfBadge(r.conv)));
   }
 
+  function cancelRateSparkline(monthly) {
+    var wrap = el("div", null);
+    wrap.style.cssText = "width:90px;height:20px;";
+    var yms = monthly ? Object.keys(monthly).sort() : [];
+    if (yms.length < 2) {
+      var noData = el("span", "sub", "데이터부족");
+      noData.style.fontSize = "10px";
+      wrap.appendChild(noData);
+      return wrap;
+    }
+    var rates = yms.map(function (ym) {
+      var b = monthly[ym];
+      var tot = bucketTotal(b, "count");
+      return tot > 0 ? (b["청약취소"].count / tot * 100) : 0;
+    });
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 90 20");
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+    svg.style.display = "block";
+    var pts = rates.map(function (v, i) {
+      return (i / (rates.length - 1) * 86 + 2) + "," + (18 - Math.min(1, v / 50) * 16);
+    });
+    var poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    poly.setAttribute("points", pts.join(" "));
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke", "var(--critical)");
+    poly.setAttribute("stroke-width", "2");
+    poly.setAttribute("stroke-linecap", "round");
+    poly.setAttribute("stroke-linejoin", "round");
+    var title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.textContent = yms.map(function (ym, i) { return ym + ": " + rates[i].toFixed(1) + "%"; }).join("\n");
+    poly.appendChild(title);
+    svg.appendChild(poly);
+    wrap.appendChild(svg);
+    return wrap;
+  }
 
+  var AI_TIER_COLOR = { "Platinum": "#8b5cf6", "Gold": "#eab308", "Silver": "#94a3b8", "Risk": "#ef4444" };
   function renderClusters(records) {
     var svg = document.getElementById("cluster-svg");
     if(!svg) return;
     svg.innerHTML = "";
-    
+
+    var colorSel = document.getElementById("cluster-color-mode");
+    var colorMode = colorSel ? colorSel.value : "kmeans";
+    var legendEl = document.getElementById("legend-cluster");
+
     var agents = agentPerfRows(records).filter(function(r) { return r.conv !== null && r.count > 0; });
     if(agents.length < 5) {
       svg.innerHTML = "<text x='50%' y='50%' text-anchor='middle' fill='#94a3b8'>데이터가 부족합니다.</text>";
+      if (legendEl) legendEl.innerHTML = "";
       return;
     }
-    
-    // Normalize data for K-Means (count, convRate)
+
+    var subEl = document.getElementById("cluster-sub");
+    var colors, clusters;
+    if (colorMode === "rfm") {
+      if (window.calculateAgentRFM) window.calculateAgentRFM(agents);
+      if (subEl) subEl.textContent = "영업자를 RFM(빈도·수익·유지율) 기준 AI 등급으로 색상 구분합니다. 원 크기는 월정료 규모입니다.";
+      if (legendEl) {
+        legendEl.innerHTML = "";
+        ["Platinum", "Gold", "Silver", "Risk"].forEach(function (t) {
+          var row = el("div", "lkey");
+          var sw = el("span", "swatch");
+          sw.style.background = AI_TIER_COLOR[t];
+          row.appendChild(sw);
+          row.appendChild(el("span", null, t));
+          legendEl.appendChild(row);
+        });
+      }
+    } else {
+      var maxCnt0 = Math.max.apply(null, agents.map(function(a){return a.count}));
+      var data = agents.map(function(a) { return [a.count / maxCnt0, a.conv / 100]; });
+      var k = Math.min(3, agents.length);
+      clusters = window.kMeans(data, k, 20);
+      colors = ["#ef4444", "#eab308", "#10b981"]; // Red, Yellow, Green
+      if (subEl) subEl.textContent = "수많은 영업자를 실적 패턴(건수, 유지전환율, 월정료)에 따라 AI가 자동 그룹화합니다.";
+      if (legendEl) legendEl.innerHTML = "";
+    }
+
+    // Normalize data for plotting (count, convRate)
     var maxCnt = Math.max.apply(null, agents.map(function(a){return a.count}));
-    var data = agents.map(function(a) { return [a.count / maxCnt, a.conv / 100]; });
-    var k = Math.min(3, agents.length);
-    var clusters = window.kMeans(data, k, 20);
-    
-    var colors = ["#ef4444", "#eab308", "#10b981"]; // Red, Yellow, Green
-    
+
     // SVG Draw
     var rect = svg.getBoundingClientRect();
     var w = rect.width || svg.clientWidth || 800, h = rect.height || svg.clientHeight || 400;
     svg.setAttribute("viewBox", "0 0 " + w + " " + h);
-    
+
     // Axes
     var xAxis = svgEl("line"); xAxis.setAttribute("x1", 40); xAxis.setAttribute("y1", h-40); xAxis.setAttribute("x2", w-20); xAxis.setAttribute("y2", h-40); xAxis.setAttribute("stroke", "#cbd5e1"); svg.appendChild(xAxis);
     var yAxis = svgEl("line"); yAxis.setAttribute("x1", 40); yAxis.setAttribute("y1", 20); yAxis.setAttribute("x2", 40); yAxis.setAttribute("y2", h-40); yAxis.setAttribute("stroke", "#cbd5e1"); svg.appendChild(yAxis);
-    
+
     var xLb = svgEl("text"); xLb.setAttribute("x", w/2); xLb.setAttribute("y", h-10); xLb.setAttribute("text-anchor", "middle"); xLb.setAttribute("fill", "#64748b"); xLb.textContent = "총 건수 (스케일)"; svg.appendChild(xLb);
     var yLb = svgEl("text"); yLb.setAttribute("x", -h/2); yLb.setAttribute("y", 15); yLb.setAttribute("transform", "rotate(-90)"); yLb.setAttribute("text-anchor", "middle"); yLb.setAttribute("fill", "#64748b"); yLb.textContent = "유지전환율 (%)"; svg.appendChild(yLb);
-    
+
     agents.forEach(function(a, i) {
       var cx = 40 + (a.count / maxCnt) * (w - 70);
       var cy = (h - 40) - (a.conv / 100) * (h - 60);
       var r = 4 + Math.min(20, (a.fee / 1000000)); // Radius by fee
-      var color = colors[clusters[i] % colors.length];
-      
+      var color = colorMode === "rfm" ? (AI_TIER_COLOR[a.aiTier] || "#94a3b8") : colors[clusters[i] % colors.length];
+
       var circle = svgEl("circle");
       circle.setAttribute("cx", cx); circle.setAttribute("cy", cy);
       circle.setAttribute("r", r);
       circle.setAttribute("fill", color);
       circle.setAttribute("opacity", "0.6");
       circle.setAttribute("stroke", "#fff");
-      
+
       var title = svgEl("title");
-      title.textContent = a.agent + " (" + shortBranch(a.branch) + ")\n건수: " + a.count + "\n유지율: " + a.conv.toFixed(1) + "%\n클러스터: Group " + (clusters[i]+1);
+      var extra = colorMode === "rfm" ? ("AI 등급: " + a.aiTier + " (점수 " + a.aiScore.toFixed(1) + ")") : ("클러스터: Group " + (clusters[i]+1));
+      title.textContent = a.agent + " (" + shortBranch(a.branch) + ")\n건수: " + a.count + "\n유지율: " + a.conv.toFixed(1) + "%\n" + extra;
       circle.appendChild(title);
       svg.appendChild(circle);
     });
@@ -3423,7 +3868,7 @@
     if (rows.length === 0) {
       var tr0 = el("tr", "empty-row");
       var td0 = el("td", null, "조건에 맞는 영업자가 없습니다.");
-      td0.colSpan = 15;
+      td0.colSpan = 16;
       tr0.appendChild(td0);
       tbody.appendChild(tr0);
     } else {
@@ -3450,6 +3895,7 @@
         tr.appendChild(tdTotal);
 
         appendPerfCells(tr, r);
+        tr.appendChild(el("td", "badge-cell", aiTierBadge(r.aiTier)));
         tbody.appendChild(tr);
       });
     }
@@ -3470,7 +3916,7 @@
     if (rows.length === 0) {
       var tr0 = el("tr", "empty-row");
       var td0 = el("td", null, "표시할 데이터가 없습니다.");
-      td0.colSpan = 13;
+      td0.colSpan = 14;
       tr0.appendChild(td0);
       tbody.appendChild(tr0);
     } else {
@@ -3495,6 +3941,9 @@
         tr.appendChild(tdTotal);
 
         appendPerfCells(tr, r);
+        var tdSpark = document.createElement("td");
+        tdSpark.appendChild(cancelRateSparkline(r.monthly));
+        tr.appendChild(tdSpark);
         tbody.appendChild(tr);
       });
     }
@@ -3837,9 +4286,12 @@
     renderKPIs(full);
     state.goal = loadGoal();
     renderGoalBox();
-    renderBranchChart(dateRecs);
-    renderBranchSummaryTable(dateRecs);
+    renderBranchChart(hqRecs);
+    renderBranchSummaryTable(hqRecs);
+    renderWeekdayHeatmap(full);
     renderTop10(bdRecs);
+    renderReferrerSummary(bdRecs);
+    renderPipeline();
     renderPerfMatrix(bdRecs);
     renderTrend(full);
     renderMonthlyTrendCharts(full);
@@ -3855,6 +4307,7 @@
   loadData(DEFAULT_DATA);
   buildLegend("legend-branch");
   buildLegend("legend-date");
+  buildLegend("legend-weekday");
   populateDateSelects();
   render();
 })();
