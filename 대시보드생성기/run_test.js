@@ -7,66 +7,81 @@ const puppeteer = require('puppeteer');
   const url = 'file://' + process.cwd() + '/test_out.html';
   await page.goto(url, { waitUntil: 'networkidle2' });
 
-  // 1) branch dropdown should list actual branches (not free text)
-  const branchOpts = await page.evaluate(() => Array.from(document.getElementById('pipe-branch').options).map(o => o.value));
-  console.log('pipe-branch options (no hq filter):', branchOpts);
+  const branchOpts = await page.evaluate(() => Array.from(document.getElementById('pipe-branch').options).map(o => o.value).filter(Boolean));
 
-  // 2) selecting a branch populates agent dropdown with existing agents for that branch
-  await page.select('#pipe-branch', branchOpts[1]);
-  await new Promise(r => setTimeout(r, 100));
-  const agentOpts = await page.evaluate(() => Array.from(document.getElementById('pipe-agent-select').options).map(o => ({v:o.value,t:o.textContent})));
-  console.log('agent options for', branchOpts[1], ':', agentOpts);
-
-  // 3) picking an existing agent + fill numbers + submit
-  const realAgentVal = agentOpts.find(o => o.v && o.v !== '__new__').v;
-  await page.select('#pipe-agent-select', realAgentVal);
-  await page.type('#pipe-count', '4');
-  await page.type('#pipe-fee', '60000');
-  await page.click('#pipe-add-btn');
-  await new Promise(r => setTimeout(r, 150));
-  console.log('rows after adding existing-agent entry:', await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length));
-
-  // 4) manual new-agent entry: select __new__, text input should appear
-  await page.select('#pipe-agent-select', '__new__');
-  const newInputVisible = await page.evaluate(() => document.getElementById('pipe-agent-new').style.display !== 'none');
-  console.log('new-agent text input visible after selecting 직접입력:', newInputVisible);
-  await page.type('#pipe-agent-new', '홍신규');
-  await page.type('#pipe-count', '2');
+  // add entry with existing agent
+  await page.select('#pipe-branch', branchOpts[0]);
+  await new Promise(r => setTimeout(r, 50));
+  const agentOpts = await page.evaluate(() => Array.from(document.getElementById('pipe-agent-select').options).map(o => o.value).filter(v => v && v !== '__new__'));
+  await page.select('#pipe-agent-select', agentOpts[0]);
+  await page.type('#pipe-count', '3');
   await page.type('#pipe-fee', '30000');
+  await page.type('#pipe-memo', '원래메모');
   await page.click('#pipe-add-btn');
   await new Promise(r => setTimeout(r, 150));
-  const rowsAfterNewAgent = await page.evaluate(() => Array.from(document.querySelectorAll('#pipeline-tbody tr')).map(r => r.children[1] ? r.children[1].textContent : null));
-  console.log('agent names in table after new-agent add:', rowsAfterNewAgent);
 
-  // 5) branch dropdown scoping by hq filter
-  await page.select('#hq-sel', '강북/강원본부');
-  await new Promise(r => setTimeout(r, 200));
-  const branchOptsHq = await page.evaluate(() => Array.from(document.getElementById('pipe-branch').options).map(o => o.value));
-  console.log('pipe-branch options under 강북/강원본부 filter:', branchOptsHq);
-  await page.select('#hq-sel', 'ALL');
-  await new Promise(r => setTimeout(r, 200));
-
-  // 6) collapse/expand: add many more entries to exceed the 8-row limit
-  for (let i = 0; i < 8; i++) {
-    await page.select('#pipe-branch', branchOpts[1]);
-    await page.select('#pipe-agent-select', '__new__');
-    await page.evaluate(() => document.getElementById('pipe-agent-new').value = '');
-    await page.type('#pipe-agent-new', '벌크' + i);
-    await page.evaluate(() => { document.getElementById('pipe-count').value = ''; document.getElementById('pipe-fee').value = ''; });
-    await page.type('#pipe-count', '1');
-    await page.type('#pipe-fee', '10000');
-    await page.click('#pipe-add-btn');
-    await new Promise(r => setTimeout(r, 60));
-  }
-  const totalRows = await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length);
-  const toggleBtnText = await page.evaluate(() => { const w = document.getElementById('pipeline-toggle-wrap'); return w && w.style.display !== 'none' ? w.innerText : null; });
-  console.log('visible rows before expand:', totalRows, 'toggle btn:', toggleBtnText);
-
-  await page.evaluate(() => document.querySelector('#pipeline-toggle-wrap button').click());
+  // add entry with manual new agent
+  await page.select('#pipe-branch', branchOpts[0]);
+  await page.select('#pipe-agent-select', '__new__');
+  await page.type('#pipe-agent-new', '커스텀담당자');
+  await page.type('#pipe-count', '1');
+  await page.type('#pipe-fee', '10000');
+  await page.click('#pipe-add-btn');
   await new Promise(r => setTimeout(r, 150));
-  const totalRowsExpanded = await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length);
-  const toggleBtnText2 = await page.evaluate(() => document.querySelector('#pipeline-toggle-wrap button').textContent);
-  console.log('visible rows after expand:', totalRowsExpanded, 'toggle btn now:', toggleBtnText2);
+
+  let rows = await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length);
+  console.log('rows after 2 adds:', rows);
+
+  // click 수정 on first row (existing-agent entry, since sorted by createdAt desc, first row = most recent = custom agent one)
+  const rowsText = await page.evaluate(() => Array.from(document.querySelectorAll('#pipeline-tbody tr')).map(r => Array.from(r.children).slice(0,5).map(td=>td.textContent)));
+  console.log('rows before edit:', rowsText);
+
+  // edit the custom-agent row (should be first, most recent)
+  await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr')[0].querySelector('button').click());
+  await new Promise(r => setTimeout(r, 100));
+  const formState = await page.evaluate(() => ({
+    branch: document.getElementById('pipe-branch').value,
+    agentSelect: document.getElementById('pipe-agent-select').value,
+    agentNewVisible: document.getElementById('pipe-agent-new').style.display !== 'none',
+    agentNewValue: document.getElementById('pipe-agent-new').value,
+    count: document.getElementById('pipe-count').value,
+    fee: document.getElementById('pipe-fee').value,
+    btnLabel: document.getElementById('pipe-add-btn').textContent,
+    cancelVisible: document.getElementById('pipe-cancel-btn').style.display !== 'none'
+  }));
+  console.log('form state after clicking 수정 on custom-agent row:', formState);
+
+  // change count and fee, save edit
+  await page.evaluate(() => { document.getElementById('pipe-count').value = ''; document.getElementById('pipe-fee').value = ''; });
+  await page.type('#pipe-count', '9');
+  await page.type('#pipe-fee', '99000');
+  await page.click('#pipe-add-btn');
+  await new Promise(r => setTimeout(r, 150));
+
+  rows = await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length);
+  const rowsAfterEdit = await page.evaluate(() => Array.from(document.querySelectorAll('#pipeline-tbody tr')).map(r => Array.from(r.children).map(td=>td.textContent)));
+  console.log('row count after edit-save (should stay same, not grow):', rows);
+  console.log('rows after edit:', rowsAfterEdit);
+
+  const btnLabelAfterSave = await page.evaluate(() => document.getElementById('pipe-add-btn').textContent);
+  const cancelVisibleAfterSave = await page.evaluate(() => document.getElementById('pipe-cancel-btn').style.display !== 'none');
+  console.log('button label after save:', btnLabelAfterSave, 'cancel visible:', cancelVisibleAfterSave);
+
+  // test cancel edit
+  await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr')[1].querySelectorAll('button')[0].click());
+  await new Promise(r => setTimeout(r, 80));
+  const midEditBranch = await page.evaluate(() => document.getElementById('pipe-branch').value);
+  await page.click('#pipe-cancel-btn');
+  await new Promise(r => setTimeout(r, 80));
+  const afterCancelBranch = await page.evaluate(() => document.getElementById('pipe-branch').value);
+  const afterCancelBtnLabel = await page.evaluate(() => document.getElementById('pipe-add-btn').textContent);
+  console.log('branch mid-edit:', midEditBranch, '-> after cancel:', afterCancelBranch, 'btn label:', afterCancelBtnLabel);
+
+  // delete the row currently NOT being edited, verify count drops by 1 and form stays in add mode
+  await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr')[0].querySelectorAll('button')[1].click());
+  await new Promise(r => setTimeout(r, 100));
+  const rowsAfterDelete = await page.evaluate(() => document.querySelectorAll('#pipeline-tbody tr').length);
+  console.log('rows after delete:', rowsAfterDelete);
 
   console.log('TOTAL ERRORS:', errors.length, errors);
   await browser.close();

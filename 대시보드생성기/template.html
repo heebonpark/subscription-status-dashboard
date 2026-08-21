@@ -451,7 +451,7 @@
       <div class="filter-group" id="hq-filter-group">
         <span class="flabel">본부</span>
         <select class="sel" id="hq-sel"></select>
-        <button class="reset-btn" id="hq-gangbuk-btn" style="margin-left:8px; background:var(--primary); color:white; border:none; padding:4px 10px;">강북/강원 전용</button>
+        <button class="reset-btn" id="hq-gangbuk-btn" style="margin-left:8px; background:var(--rank-bar); color:white; border:none; padding:4px 10px;">강북/강원 전용</button>
       </div>
       <div class="filter-divider" id="org-divider"></div>
       <div class="filter-group" id="branch-filter-group">
@@ -526,7 +526,8 @@
           <div class="flabel" style="margin-bottom:4px;">메모</div>
           <input type="text" class="sel" id="pipe-memo" placeholder="선택 입력" style="width:100%;">
         </div>
-        <button class="reset-btn" id="pipe-add-btn" style="background:var(--primary); color:#fff; border:none; padding:7px 16px; height:34px;">+ 등록</button>
+        <button class="reset-btn" id="pipe-add-btn" style="background:var(--rank-bar); color:#fff; border:none; padding:7px 16px; height:34px;">+ 등록</button>
+        <button class="reset-btn" id="pipe-cancel-btn" style="padding:7px 16px; height:34px; display:none;">취소</button>
       </div>
       <p class="sub" id="pipe-error" style="color:var(--critical); display:none;"></p>
       <div class="kpis" id="pipeline-kpis" style="margin-bottom:14px;"></div>
@@ -1380,7 +1381,7 @@
     hqGangbukBtn.addEventListener("click", function() {
       if (state.custom_branches) {
          state.custom_branches = null;
-         hqGangbukBtn.style.background = "var(--primary)";
+         hqGangbukBtn.style.background = "var(--rank-bar)";
       } else {
          state.custom_branches = ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"];
          state.hq = null;
@@ -2313,6 +2314,7 @@
   var PIPELINE_ENTRIES = loadPipeline();
   var PIPELINE_COLLAPSE_LIMIT = 8;
   var PIPE_NEW_AGENT = "__new__";
+  var PIPELINE_EDITING_ID = null;
 
   function pipeBranchOptions() {
     var branches = ALL_BRANCHES || [];
@@ -2421,22 +2423,30 @@
     var showCount = state.pipelineOpen ? scoped.length : Math.min(PIPELINE_COLLAPSE_LIMIT, scoped.length);
     scoped.slice(0, showCount).forEach(function (p) {
       var tr = document.createElement("tr");
+      if (p.id === PIPELINE_EDITING_ID) tr.classList.add("selected");
       tr.appendChild(el("td", null, shortBranch(p.branch)));
       tr.appendChild(el("td", null, p.agent));
       tr.appendChild(el("td", null, fmt(p.count)));
       tr.appendChild(el("td", null, fmtFee(p.fee)));
       tr.appendChild(el("td", null, p.memo || ""));
-      tr.appendChild(el("td", null, p.createdAt.replace("T", " ").slice(0, 16)));
-      var tdDel = document.createElement("td");
+      var dateLabel = (p.updatedAt || p.createdAt).replace("T", " ").slice(0, 16) + (p.updatedAt ? " (수정됨)" : "");
+      tr.appendChild(el("td", null, dateLabel));
+      var tdActions = document.createElement("td");
+      tdActions.style.whiteSpace = "nowrap";
+      var editBtn = el("button", "reset-btn", "수정");
+      editBtn.style.cssText = "padding:3px 8px; font-size:11px; margin-right:4px;";
+      editBtn.addEventListener("click", function () { startEditPipelineEntry(p); });
+      tdActions.appendChild(editBtn);
       var delBtn = el("button", "reset-btn", "삭제");
       delBtn.style.cssText = "padding:3px 8px; font-size:11px;";
       delBtn.addEventListener("click", function () {
         PIPELINE_ENTRIES = PIPELINE_ENTRIES.filter(function (x) { return x.id !== p.id; });
+        if (PIPELINE_EDITING_ID === p.id) resetPipelineForm();
         savePipeline();
         renderPipeline();
       });
-      tdDel.appendChild(delBtn);
-      tr.appendChild(tdDel);
+      tdActions.appendChild(delBtn);
+      tr.appendChild(tdActions);
       tbody.appendChild(tr);
     });
 
@@ -2457,6 +2467,70 @@
   if (pipeBranchSel) pipeBranchSel.addEventListener("change", updatePipeAgentOptions);
   var pipeAgentSel = document.getElementById("pipe-agent-select");
   if (pipeAgentSel) pipeAgentSel.addEventListener("change", togglePipeAgentNewInput);
+
+  function resetPipelineForm() {
+    PIPELINE_EDITING_ID = null;
+    var branchInput = document.getElementById("pipe-branch");
+    var agentSelEl = document.getElementById("pipe-agent-select");
+    var agentNewInput = document.getElementById("pipe-agent-new");
+    var countInput = document.getElementById("pipe-count");
+    var feeInput = document.getElementById("pipe-fee");
+    var memoInput = document.getElementById("pipe-memo");
+    var errEl = document.getElementById("pipe-error");
+    var addBtn = document.getElementById("pipe-add-btn");
+    var cancelBtn = document.getElementById("pipe-cancel-btn");
+    if (branchInput) branchInput.value = "";
+    if (agentNewInput) { agentNewInput.value = ""; agentNewInput.style.display = "none"; }
+    if (countInput) countInput.value = "";
+    if (feeInput) feeInput.value = "";
+    if (memoInput) memoInput.value = "";
+    if (errEl) errEl.style.display = "none";
+    if (addBtn) addBtn.textContent = "+ 등록";
+    if (cancelBtn) cancelBtn.style.display = "none";
+    updatePipeAgentOptions();
+  }
+
+  function startEditPipelineEntry(p) {
+    PIPELINE_EDITING_ID = p.id;
+    var branchInput = document.getElementById("pipe-branch");
+    var agentSelEl = document.getElementById("pipe-agent-select");
+    var agentNewInput = document.getElementById("pipe-agent-new");
+    var countInput = document.getElementById("pipe-count");
+    var feeInput = document.getElementById("pipe-fee");
+    var memoInput = document.getElementById("pipe-memo");
+    var addBtn = document.getElementById("pipe-add-btn");
+    var cancelBtn = document.getElementById("pipe-cancel-btn");
+    var errEl = document.getElementById("pipe-error");
+
+    branchInput.value = p.branch;
+    updatePipeAgentOptions();
+    var hasOption = Array.prototype.some.call(agentSelEl.options, function (o) { return o.value === p.agent; });
+    if (hasOption) {
+      agentSelEl.value = p.agent;
+      agentNewInput.value = "";
+      agentNewInput.style.display = "none";
+    } else {
+      agentSelEl.value = PIPE_NEW_AGENT;
+      agentNewInput.value = p.agent;
+      agentNewInput.style.display = "";
+    }
+    countInput.value = p.count;
+    feeInput.value = p.fee;
+    memoInput.value = p.memo || "";
+    if (errEl) errEl.style.display = "none";
+    addBtn.textContent = "수정 저장";
+    cancelBtn.style.display = "";
+    renderPipeline();
+    document.getElementById("pipeline-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  var pipeCancelBtn = document.getElementById("pipe-cancel-btn");
+  if (pipeCancelBtn) {
+    pipeCancelBtn.addEventListener("click", function () {
+      resetPipelineForm();
+      renderPipeline();
+    });
+  }
 
   var pipeAddBtn = document.getElementById("pipe-add-btn");
   if (pipeAddBtn) {
@@ -2484,14 +2558,21 @@
       }
       errEl.style.display = "none";
 
-      PIPELINE_ENTRIES.push({
-        id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
-        branch: branch, agent: agent, count: count, fee: fee, memo: memo,
-        createdAt: new Date().toISOString()
-      });
+      if (PIPELINE_EDITING_ID) {
+        var target = PIPELINE_ENTRIES.filter(function (x) { return x.id === PIPELINE_EDITING_ID; })[0];
+        if (target) {
+          target.branch = branch; target.agent = agent; target.count = count; target.fee = fee; target.memo = memo;
+          target.updatedAt = new Date().toISOString();
+        }
+      } else {
+        PIPELINE_ENTRIES.push({
+          id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+          branch: branch, agent: agent, count: count, fee: fee, memo: memo,
+          createdAt: new Date().toISOString()
+        });
+      }
       savePipeline();
-      agentSelEl.value = ""; agentNewInput.value = ""; agentNewInput.style.display = "none";
-      countInput.value = ""; feeInput.value = ""; memoInput.value = "";
+      resetPipelineForm();
       renderPipeline();
     });
   }
@@ -2579,7 +2660,7 @@
         var poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         poly.setAttribute("points", pts.join(" "));
         poly.setAttribute("fill", "none");
-        poly.setAttribute("stroke", "var(--primary)");
+        poly.setAttribute("stroke", "var(--rank-bar)");
         poly.setAttribute("stroke-width", "2");
         poly.setAttribute("stroke-linecap", "round");
         poly.setAttribute("stroke-linejoin", "round");
