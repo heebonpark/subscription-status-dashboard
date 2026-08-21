@@ -18,6 +18,8 @@
     --rank-bar:       #2563eb;
     --cat-2:          #3b82f6;
     --cat-3:          #14b8a6;
+    --pipeline:       #8b5cf6;
+    --terminated:     #991b1b;
     --chip-bg:        #f1f5f9;
     --chip-active-bg: #0f172a;
     --chip-active-fg: #ffffff;
@@ -45,6 +47,8 @@
       --rank-bar:       #3b82f6;
       --cat-2:          #60a5fa;
       --cat-3:          #2dd4bf;
+      --pipeline:       #a78bfa;
+      --terminated:     #fb923c;
       --chip-bg:        #1e293b;
       --chip-active-bg: #2563eb;
       --chip-active-fg: #ffffff;
@@ -166,6 +170,8 @@
   .tile .tvalue.good { color: var(--good); }
   .tile .tvalue.warning { color: #a06a00; }
   .tile .tvalue.critical { color: var(--critical); }
+  .tile .tvalue.pipeline { color: var(--pipeline); }
+  .tile .tvalue.terminated { color: var(--terminated); }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .tile .tvalue.warning { color: var(--warning); }
   }
@@ -423,7 +429,7 @@
       </div>
       <div class="filter-divider"></div>
       <div class="filter-group">
-        <span class="flabel">취소/해지</span>
+        <span class="flabel">해지</span>
         <div class="toggle-group" id="cancel-toggle">
           <button data-v="include" class="active">포함</button>
           <button data-v="exclude">제외</button>
@@ -465,7 +471,7 @@
     <div class="card" id="summary-card">
       <h2 id="summary-scope">전체 지사</h2>
       <p class="sub" id="summary-date">전체</p>
-      <div style="font-size:24px; font-weight:700; margin:12px 0;"><span id="summary-count">0</span>건</div>
+      <div style="font-size:24px; font-weight:700; margin:12px 0;"><span id="summary-count">0건</span></div>
       <div class="summary-detail" id="summary-detail"></div>
     </div>
 
@@ -573,7 +579,7 @@
       <div class="card" style="flex: 1; min-width: 400px;">
         <div class="card-head">
           <h2 class="card-title">지표 간 상관관계 (Correlation Heatmap)</h2>
-          <p class="sub">월정료, 건수, 유지/취소율 간의 피어슨 상관계수(1에 가까울수록 비례) 매트릭스입니다.</p>
+          <p class="sub">월정료, 건수, 유지/해지율 간의 피어슨 상관계수(1에 가까울수록 비례) 매트릭스입니다.</p>
         </div>
         <div class="chart-wrap" style="height:350px; display:flex; align-items:center; justify-content:center; background:#f8fafc; border-radius:8px;">
           <svg id="corr-svg" width="100%" height="100%"></svg>
@@ -626,12 +632,12 @@
               <th data-key="maintainFee">유지월정료</th>
               <th data-key="pendingCount">청약</th>
               <th data-key="pendingFee">청약월정료</th>
-              <th data-key="cancelCount">취소</th>
-              <th data-key="cancelFee">취소월정료</th>
-              <th data-key="cancelRate">취소율</th>
+              <th data-key="cancelCount">해지</th>
+              <th data-key="cancelFee">해지월정료</th>
+              <th data-key="cancelRate">해지율</th>
               <th data-key="conv">전환율</th>
               <th data-key="conv">평가</th>
-              <th>취소율 추이</th>
+              <th>해지율 추이</th>
             </tr>
           </thead>
           <tbody id="branch-summary-tbody"></tbody>
@@ -658,7 +664,7 @@
               <th>총월정료</th>
               <th>유지</th>
               <th>청약</th>
-              <th>취소</th>
+              <th>해지</th>
               <th>전환율</th>
             </tr>
           </thead>
@@ -728,7 +734,7 @@
       <div class="drill-head">
         <div>
           <h2 style="margin-bottom:2px;">월별 유지·청약 추이 분석</h2>
-          <p class="sub" id="monthly-analysis-sub" style="font-size:13px;margin-bottom:0;">월별 유지·청약·취소/해지 건수와 전월 대비 증감입니다.</p>
+          <p class="sub" id="monthly-analysis-sub" style="font-size:13px;margin-bottom:0;">월별 유지·청약·해지 건수와 전월 대비 증감입니다.</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <div class="toggle-group" id="mline-view-toggle">
@@ -803,6 +809,22 @@
         <p class="sub" id="mline-combined-proj-note" style="margin:6px 0 0;font-size:13px;"></p>
       </div>
 
+      <p class="sub" style="margin:22px 0 2px;font-weight:650;color:var(--text-primary);font-size:15px;">
+        <span class="mline-title-swatch" style="background:var(--terminated);"></span><span id="mline-terminated-title">월별 해지(일반해지) 건수 추이</span>
+      </p>
+      <div class="mline-outer">
+        <div class="mline-yaxis" id="mline-terminated-yaxis"></div>
+        <div class="mline-scroll" id="mline-terminated-scroll">
+          <div class="mline-plot" id="mline-terminated-plot">
+            <svg id="mline-terminated-svg"></svg>
+            <div class="mline-hitrow" id="mline-terminated-hitrow"></div>
+            <div class="mline-crosshair" id="mline-terminated-crosshair"></div>
+          </div>
+          <div class="mline-axis-x" id="mline-terminated-axis-x"></div>
+        </div>
+      </div>
+      <p class="sub" id="mline-terminated-proj-note" style="margin:6px 0 0;font-size:13px;"></p>
+
       <p class="sub" style="margin:20px 0 8px;font-weight:650;color:var(--text-primary);font-size:15px;">월별 월정료 추이 (전체 합산)</p>
       <div class="trend-scroll">
         <div class="colchart" id="mfee-chart"></div>
@@ -822,8 +844,8 @@
               <th>청약</th>
               <th>청약월정료</th>
               <th>청약 증감</th>
-              <th>취소/해지</th>
-              <th>취소월정료</th>
+              <th>해지</th>
+              <th>해지월정료</th>
               <th>총건수</th>
               <th>총월정료</th>
             </tr>
@@ -842,6 +864,12 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <div class="toggle-group" id="yoy-year-toggle"></div>
+          <div class="toggle-group" id="yoy-status-toggle">
+            <button data-v="" class="active">전체</button>
+            <button data-v="유지">유지</button>
+            <button data-v="청약">청약</button>
+            <button data-v="해지">해지</button>
+          </div>
           <div class="toggle-group" id="yoy-metric-toggle">
             <button data-v="count" class="active">건수</button>
             <button data-v="fee">월정료</button>
@@ -869,6 +897,28 @@
     </div>
 
     <div class="card">
+      <div class="drill-head">
+        <div>
+          <h2 style="margin-bottom:2px;">해지(일반해지) 연도별 비교</h2>
+          <p class="sub" style="margin-bottom:0;" id="yoy-term-sub">같은 달의 해지 건수를 연도별로 겹쳐서 비교합니다</p>
+        </div>
+      </div>
+      <div class="mline-outer" style="margin-top:10px;">
+        <div class="mline-yaxis" id="yoy-term-yaxis"></div>
+        <div class="mline-scroll" id="yoy-term-scroll">
+          <div class="mline-plot" id="yoy-term-plot">
+            <svg id="yoy-term-svg"></svg>
+            <div class="mline-hitrow" id="yoy-term-hitrow"></div>
+            <div class="mline-crosshair" id="yoy-term-crosshair"></div>
+          </div>
+          <div class="mline-axis-x" id="yoy-term-axis-x"></div>
+        </div>
+      </div>
+      <div class="quadrant-census" id="yoy-term-legend" style="margin-top:8px;"></div>
+      <p class="sub" id="yoy-term-note" style="margin:0 0 0;font-size:13px;"></p>
+    </div>
+
+    <div class="card">
       <div class="table-head-row">
         <div>
           <h2 style="margin-bottom:2px;">영업자별 실적</h2>
@@ -891,9 +941,9 @@
               <th data-key="maintainFee">유지월정료</th>
               <th data-key="pendingCount">청약</th>
               <th data-key="pendingFee">청약월정료</th>
-              <th data-key="cancelCount">취소</th>
-              <th data-key="cancelFee">취소월정료</th>
-              <th data-key="cancelRate">취소율</th>
+              <th data-key="cancelCount">해지</th>
+              <th data-key="cancelFee">해지월정료</th>
+              <th data-key="cancelRate">해지율</th>
               <th data-key="conv">전환율</th>
               <th data-key="conv">평가</th>
               <th data-key="aiScore">AI등급</th>
@@ -913,9 +963,9 @@
   "use strict";
 
   var DEFAULT_DATA = __DASHBOARD_DATA_JSON__;
-  var STATUSES = ["유지", "청약", "청약취소"];
-  var STATUS_COLOR = { "유지": "var(--good)", "청약": "var(--warning)", "청약취소": "var(--critical)" };
-  var STATUS_LABEL = { "유지": "유지", "청약": "청약(진행)", "청약취소": "취소/해지" };
+  var STATUSES = ["유지", "청약", "해지"];
+  var STATUS_COLOR = { "유지": "var(--good)", "청약": "var(--warning)", "해지": "var(--terminated)" };
+  var STATUS_LABEL = { "유지": "유지", "청약": "청약(진행)", "해지": "해지(일반해지)" };
   var REQUIRED_COLS = ["영업지사명", "영업자명", "영업자소속", "청약일자", "계약상태(중)", "계약번호", "상호", "KTT월정료"];
   var PLACEHOLDER_AGENT = "추천자와동일";
 
@@ -930,7 +980,7 @@
     feeUnit: "천원",
     metric: "count", topN: 10, trendView: "daily", trendGranularity: "month", perfMetric: "전체", miniTrendMetric: "count", miniTrendView: "split",
     showMA: true, showCI: true, showOutliers: true,
-    yoyMetric: "count", yoyYears: null, yoyMode: "raw",
+    yoyMetric: "count", yoyYears: null, yoyMode: "raw", yoyStatus: "",
     excludeCancelled: false, excludePlaceholder: false,
     summaryOpen: false, agentListOpen: false, pipelineOpen: false,
     goal: { count: null, fee: null }
@@ -971,7 +1021,7 @@
     return e;
   }
 
-  function emptyBucket() { return { "유지": { count: 0, fee: 0 }, "청약": { count: 0, fee: 0 }, "청약취소": { count: 0, fee: 0 } }; }
+  function emptyBucket() { return { "유지": { count: 0, fee: 0 }, "청약": { count: 0, fee: 0 }, "해지": { count: 0, fee: 0 } }; }
   function addToBucket(bucket, r) { var s = r[4]; bucket[s].count++; bucket[s].fee += r[7]; }
   function bucketTotal(bucket, metric) { return STATUSES.reduce(function (sum, s) { return sum + bucket[s][metric]; }, 0); }
 
@@ -1101,7 +1151,7 @@
   }
   function baseRecords() {
     return RECORDS.filter(function (r) {
-      if (state.excludeCancelled && r[4] === "청약취소") return false;
+      if (state.excludeCancelled && r[4] === "해지") return false;
       if (state.excludePlaceholder && r[1] === PLACEHOLDER_AGENT) return false;
       if (state.custom_branches) {
         var match = false;
@@ -1462,9 +1512,16 @@
       var date = normalizeDate((r[idx["청약일자"]] || "").trim());
       if (!date) { skipped++; continue; }
       var statusRaw = (r[idx["계약상태(중)"]] || "").trim();
-      var status = (statusRaw.indexOf("취소") !== -1 || statusRaw.indexOf("해지") !== -1) ? "청약취소" : ((statusRaw === "유지" || statusRaw === "명변유지") ? "유지" : "청약");
+      var isOtherCancelStatus = statusRaw !== "일반해지" &&
+        (statusRaw.indexOf("취소") !== -1 || statusRaw.indexOf("해지") !== -1);
+      // 1번 파일(메인 CSV)의 취소/해지류(청약취소·명변해지·전출해지 등)는 해지(일반해지)와
+      // 별개이며 대시보드 전체에서 제외합니다. 해지(2번 파일)만 별도 상태로 취급합니다.
+      if (isOtherCancelStatus) { skipped++; continue; }
+      var status = statusRaw === "일반해지" ? "해지"
+        : ((statusRaw === "유지" || statusRaw === "명변유지") ? "유지" : "청약");
       var fee = parseInt(String(r[idx["KTT월정료"]] || "0").replace(/[^0-9-]/g, ""), 10);
       if (isNaN(fee)) fee = 0;
+      // 월정료 0원/빈칸은 상태에 관계없이 제외합니다(엑셀 직접 검증 결과와 일치하는 기준입니다).
       if (fee === 0) { skipped++; continue; }
       var hqVal = hqIdx >= 0 ? (r[hqIdx] || "").trim() : "";
       if (hqVal === "강원본부") hqVal = "강북/강원본부";
@@ -1616,7 +1673,7 @@
       refTable.className = "data one-label";
       var refThead = document.createElement("thead");
       var refHtr = document.createElement("tr");
-      ["추천자", "건수", "월정료", "유지", "청약", "취소"].forEach(function (t) { refHtr.appendChild(el("th", null, t)); });
+      ["추천자", "건수", "월정료", "유지", "청약", "해지"].forEach(function (t) { refHtr.appendChild(el("th", null, t)); });
       refThead.appendChild(refHtr); refTable.appendChild(refThead);
       var refTbody = document.createElement("tbody");
       refRows.forEach(function (r) {
@@ -1626,7 +1683,7 @@
         tr.appendChild(el("td", null, fmtFee(r.fee)));
         tr.appendChild(el("td", null, fmt(r.bucket["유지"].count)));
         tr.appendChild(el("td", null, fmt(r.bucket["청약"].count)));
-        tr.appendChild(el("td", null, fmt(r.bucket["청약취소"].count)));
+        tr.appendChild(el("td", null, fmt(r.bucket["해지"].count)));
         refTbody.appendChild(tr);
       });
       refTable.appendChild(refTbody);
@@ -1699,10 +1756,10 @@
     records.forEach(function (r) { addToBucket(bucket, r); });
     var total = bucketTotal(bucket, "count");
     var totalFee = bucketTotal(bucket, "fee");
-    var maintain = bucket["유지"].count, pending = bucket["청약"].count, cancel = bucket["청약취소"].count;
-    var maintainFee = bucket["유지"].fee, pendingFee = bucket["청약"].fee, cancelFee = bucket["청약취소"].fee;
-    var cancelRate = total ? (cancel / total * 100) : 0;
-    var convRate = (maintain + cancel) > 0 ? (maintain / (maintain + cancel) * 100) : null;
+    var maintain = bucket["유지"].count, pending = bucket["청약"].count, terminated = bucket["해지"].count;
+    var maintainFee = bucket["유지"].fee, pendingFee = bucket["청약"].fee, terminatedFee = bucket["해지"].fee;
+    var terminatedRate = total ? (terminated / total * 100) : 0;
+    var convRate = (maintain + terminated) > 0 ? (maintain / (maintain + terminated) * 100) : null;
     var agents = {};
     records.forEach(function (r) { agents[r[0] + "|" + r[1]] = 1; });
 
@@ -1711,11 +1768,16 @@
       { label: "월정료 합계", value: fmtFee(totalFee), cls: "" },
       { label: "유지", value: fmt(maintain) + "건", subValue: fmtFee(maintainFee), cls: "good" },
       { label: "청약(진행중)", value: fmt(pending) + "건", subValue: fmtFee(pendingFee), cls: "warning" },
-      { label: "취소/해지", value: fmt(cancel) + "건", subValue: fmtFee(cancelFee), cls: "critical" },
-      { label: "취소율", value: cancelRate.toFixed(1) + "%", cls: cancelRate >= 10 ? "critical" : "" },
+      { label: "해지(일반해지)", value: fmt(terminated) + "건", subValue: fmtFee(terminatedFee), cls: "terminated" },
+      { label: "해지율", value: terminatedRate.toFixed(1) + "%", cls: terminatedRate >= 10 ? "terminated" : "" },
       { label: "유지전환율", value: convRate === null ? "–" : convRate.toFixed(1) + "%", cls: convRate !== null && convRate < 70 ? "critical" : "good" },
       { label: "활동 영업자", value: fmt(Object.keys(agents).length) + "명", cls: "" }
     ];
+
+    var pipelineScoped = scopedPipelineEntries();
+    var pipelineCount = pipelineScoped.reduce(function (s, p) { return s + p.count; }, 0);
+    var pipelineFee = pipelineScoped.reduce(function (s, p) { return s + p.fee; }, 0);
+    tiles.push({ label: "신/파 (신규 파이프라인)", value: fmt(pipelineCount) + "건", subValue: fmtFee(pipelineFee), cls: "pipeline" });
 
     
     // AI Anomaly Detection: Cancel Rate Spike
@@ -1757,6 +1819,8 @@
         if(t.cls === "good") sub.style.color = "var(--good)";
         if(t.cls === "warning") sub.style.color = "var(--warning)";
         if(t.cls === "critical") sub.style.color = "var(--critical)";
+        if(t.cls === "pipeline") sub.style.color = "var(--pipeline)";
+        if(t.cls === "terminated") sub.style.color = "var(--terminated)";
         tile.appendChild(sub);
       }
       wrap.appendChild(tile);
@@ -2127,6 +2191,13 @@
       render();
     });
   });
+  document.querySelectorAll("#yoy-status-toggle button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      state.yoyStatus = btn.getAttribute("data-v");
+      document.querySelectorAll("#yoy-status-toggle button").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      render();
+    });
+  });
   document.querySelectorAll("#yoy-metric-toggle button").forEach(function (btn) {
     btn.addEventListener("click", function () {
       state.yoyMetric = btn.getAttribute("data-v");
@@ -2148,14 +2219,20 @@
     var rows = aggregateByBranch(records).sort(function (a, b) { return b[state.metric] - a[state.metric]; });
     var maxTotal = rows.reduce(function (m, r) { return Math.max(m, r[state.metric]); }, 0) || 1;
     document.getElementById("branch-chart-sub").textContent =
-      "유지 · 청약(진행) · 취소/해지 " + (state.metric === "fee" ? "월정료" : "건수") + " 기준 · 청약일자 필터만 적용 · 지사명이나 막대를 클릭하면 지사가 선택됩니다";
+      "유지 · 청약(진행) · 해지(일반해지) " + (state.metric === "fee" ? "월정료" : "건수") + " 기준 · 청약일자(해지는 해지일자) 필터만 적용 · 지사명이나 막대를 클릭하면 지사가 선택됩니다 · 오른쪽 보라색 막대는 신/파(신규 파이프라인, 수기 등록분)입니다";
 
     var wrap = document.getElementById("branch-chart");
     wrap.innerHTML = "";
     if (rows.length === 0) { wrap.appendChild(el("p", "sub", "표시할 데이터가 없습니다.")); return; }
 
+    var pipelineByBranch = pipelineTotalsByBranch();
+    var maxPipeline = Object.keys(pipelineByBranch).reduce(function (m, b) {
+      return Math.max(m, pipelineByBranch[b][state.metric]);
+    }, 0) || 1;
+
     function createRow(r) {
       var rowEl = el("div", "branch-row" + (state.branch === r.branch ? " selected" : ""));
+      rowEl.style.gridTemplateColumns = "90px 1fr 64px 90px";
       var name = el("div", "bname", shortBranch(r.branch));
       name.style.cursor = "pointer";
       name.addEventListener("click", function () { state.branch = (state.branch === r.branch) ? null : r.branch; state.agent = null; render(); });
@@ -2183,6 +2260,34 @@
       });
       rowEl.appendChild(track);
       rowEl.appendChild(el("div", "btotal", fmtMetric(r[state.metric], state.metric)));
+
+      var pipe = pipelineByBranch[r.branch];
+      var pipeWrap = el("div", null);
+      pipeWrap.style.cssText = "display:flex; align-items:center; gap:4px;";
+      if (pipe && pipe[state.metric] > 0) {
+        var pipeTrack = el("div", "bartrack");
+        pipeTrack.style.cssText = "height:14px; flex:1;";
+        var pipeSeg = el("div", "seg");
+        pipeSeg.style.cssText = "background:var(--pipeline); height:14px; width:" + (pipe[state.metric] / maxPipeline * 100) + "%;";
+        pipeSeg.tabIndex = 0;
+        var pipeTitle = shortBranch(r.branch) + " · 신/파(신규 파이프라인)";
+        pipeSeg.setAttribute("aria-label", pipeTitle + " " + fmtMetric(pipe[state.metric], state.metric));
+        var pipeTtRows = [{ color: "var(--pipeline)", label: "신/파 (신규 파이프라인)", value: pipe[state.metric] }];
+        pipeSeg.addEventListener("pointermove", function (evt) { showColorTooltip(evt, pipeTitle, pipeTtRows, state.metric); });
+        pipeSeg.addEventListener("pointerleave", hideTooltip);
+        pipeSeg.addEventListener("focus", function (evt) { showColorTooltip(evt, pipeTitle, pipeTtRows, state.metric); });
+        pipeSeg.addEventListener("blur", hideTooltip);
+        pipeTrack.appendChild(pipeSeg);
+        pipeWrap.appendChild(pipeTrack);
+        var pipeVal = el("div", null, fmtMetric(pipe[state.metric], state.metric));
+        pipeVal.style.cssText = "font-size:11px; color:var(--pipeline); white-space:nowrap;";
+        pipeWrap.appendChild(pipeVal);
+      } else {
+        var pipeEmpty = el("div", "sub", "–");
+        pipeEmpty.style.fontSize = "12px";
+        pipeWrap.appendChild(pipeEmpty);
+      }
+      rowEl.appendChild(pipeWrap);
       return rowEl;
     }
 
@@ -2364,6 +2469,24 @@
     newInput.style.display = agentSelEl.value === PIPE_NEW_AGENT ? "" : "none";
   }
 
+  function scopedPipelineEntries() {
+    return PIPELINE_ENTRIES.filter(function (p) {
+      if (state.hq && (BRANCH_HQ_MAP[p.branch] || null) !== state.hq) return false;
+      if (state.branch && p.branch !== state.branch) return false;
+      return true;
+    });
+  }
+
+  function pipelineTotalsByBranch() {
+    var map = {};
+    scopedPipelineEntries().forEach(function (p) {
+      if (!map[p.branch]) map[p.branch] = { count: 0, fee: 0 };
+      map[p.branch].count += p.count;
+      map[p.branch].fee += p.fee;
+    });
+    return map;
+  }
+
   function renderPipeline() {
     var branchSelEl = document.getElementById("pipe-branch");
     if (branchSelEl) {
@@ -2382,11 +2505,7 @@
     }
     updatePipeAgentOptions();
 
-    var scoped = PIPELINE_ENTRIES.filter(function (p) {
-      if (state.hq && (BRANCH_HQ_MAP[p.branch] || null) !== state.hq) return false;
-      if (state.branch && p.branch !== state.branch) return false;
-      return true;
-    }).sort(function (a, b) { return b.createdAt.localeCompare(a.createdAt); });
+    var scoped = scopedPipelineEntries().sort(function (a, b) { return b.createdAt.localeCompare(a.createdAt); });
 
     var totalCount = scoped.reduce(function (s, p) { return s + p.count; }, 0);
     var totalFee = scoped.reduce(function (s, p) { return s + p.fee; }, 0);
@@ -2443,7 +2562,7 @@
         PIPELINE_ENTRIES = PIPELINE_ENTRIES.filter(function (x) { return x.id !== p.id; });
         if (PIPELINE_EDITING_ID === p.id) resetPipelineForm();
         savePipeline();
-        renderPipeline();
+        render();
       });
       tdActions.appendChild(delBtn);
       tr.appendChild(tdActions);
@@ -2573,7 +2692,7 @@
       }
       savePipeline();
       resetPipelineForm();
-      renderPipeline();
+      render();
     });
   }
 
@@ -2606,7 +2725,7 @@
       name.appendChild(document.createTextNode(r.agent + " "));
       
       // Quality Badge Check (유지비중 >= 90%)
-      var totalCnt = r.bucket["유지"].count + r.bucket["청약취소"].count;
+      var totalCnt = r.bucket["유지"].count + r.bucket["해지"].count;
       var convRate = totalCnt > 0 ? (r.bucket["유지"].count / totalCnt * 100) : null;
       if (convRate >= 90) {
         var qBadge = el("span", null, "🌟");
@@ -2714,7 +2833,7 @@
     return "–";
   }
   function toSummaryRow(agg) {
-    var m = agg.bucket["유지"], p = agg.bucket["청약"], c = agg.bucket["청약취소"];
+    var m = agg.bucket["유지"], p = agg.bucket["청약"], c = agg.bucket["해지"];
     var denom = m.count + c.count;
     var out = {
       branch: agg.branch, agent: agg.agent, affiliation: agg.affiliation,
@@ -2765,7 +2884,7 @@
     var medY = companyRate !== null ? companyRate : median(plottable.map(function (r) { return r.conv; }));
     document.getElementById("perf-axis-x").textContent = "→ " + xLabel + " (0 ~ " + fmt(maxX) + ")";
     document.getElementById("perf-axis-sub").textContent =
-      "X축: " + xLabel + " · Y축: 유지 비중(%, 취소/해지 제외) · 점 크기: 월정료 · 점선: " +
+      "X축: " + xLabel + " · Y축: 유지 비중(%, 해지 제외) · 점 크기: 월정료 · 점선: " +
       (companyRate !== null ? ("전사 평균 유지 비중 " + companyRate.toFixed(1) + "%") : ("유지 비중 중앙값 " + medY.toFixed(1) + "%")) +
       " (가로) · " + xLabel + " 중앙값 " + fmt(medX) + "건 (세로) · 점을 클릭하면 상세보기로 이동합니다";
 
@@ -2875,7 +2994,7 @@
     });
 
     var footNote = unresolved > 0
-      ? (unresolved + "명은 취소/해지 이력만 있어(유지·청약 이력 없음) 매트릭스에서 제외했습니다.")
+      ? (unresolved + "명은 해지 이력만 있어(유지·청약 이력 없음) 매트릭스에서 제외했습니다.")
       : "";
 
     // callouts
@@ -2953,7 +3072,7 @@
     var minW = Math.max(320, buckets.length * perCol) + "px";
     chartEl.style.minWidth = minW; axisEl.style.minWidth = minW;
 
-    var cum = { "유지": 0, "청약": 0, "청약취소": 0 };
+    var cum = { "유지": 0, "청약": 0, "해지": 0 };
     var series = buckets.map(function (k) {
       var b = byBucket[k];
       var out = {};
@@ -3295,6 +3414,7 @@
     document.getElementById("mline-maintain-title").textContent = "월별 유지 " + (metric === "fee" ? "월정료" : "건수") + " 추이";
     document.getElementById("mline-pending-title").textContent = "월별 청약(진행) " + (metric === "fee" ? "월정료" : "건수") + " 추이";
     document.getElementById("mline-combined-title").textContent = "월별 유지+청약 합계 " + (metric === "fee" ? "월정료" : "건수") + " 추이";
+    document.getElementById("mline-terminated-title").textContent = "월별 해지(일반해지) " + (metric === "fee" ? "월정료" : "건수") + " 추이";
     document.getElementById("mline-scale-note").textContent = "두 차트는 각자의 " + (metric === "fee" ? "월정료" : "건수") +
       " 규모에 맞춰 축을 따로 조정했습니다 (같은 축을 쓰면 청약 값이 유지 값에 눌려 잘 보이지 않습니다).";
 
@@ -3302,16 +3422,20 @@
       renderMiniLineChart("maintain", [], [], "var(--good)", "유지", {}, metric);
       renderMiniLineChart("pending", [], [], "var(--warning)", "청약", {}, metric);
       renderMiniLineChart("combined", [], [], "var(--rank-bar)", null, {}, metric);
+      renderMiniLineChart("terminated", [], [], "var(--terminated)", "해지", {}, metric);
       feeChartEl.appendChild(el("p", "sub", "표시할 데이터가 없습니다."));
       return;
     }
 
     var maintainVals = months.map(function (ym) { return byMonth[ym]["유지"][metric]; });
     var pendingVals = months.map(function (ym) { return byMonth[ym]["청약"][metric]; });
+    var terminatedVals = months.map(function (ym) { return byMonth[ym]["해지"][metric]; });
     var feeVals = months.map(function (ym) { return bucketTotal(byMonth[ym], "fee"); });
 
     var maintainProj = computeProjection(records, months, maintainVals);
     var pendingProj = computeProjection(records, months, pendingVals);
+    var terminatedProj = computeProjection(records, months, terminatedVals);
+    renderMiniLineChart("terminated", months, terminatedVals, "var(--terminated)", "해지", terminatedProj, metric);
 
     if (view === "split") {
       renderMiniLineChart("maintain", months, maintainVals, "var(--good)", "유지", maintainProj, metric);
@@ -3358,7 +3482,7 @@
       "월별 상세 분석" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : ""));
     var sub = document.getElementById("month-anal-sub");
     if (sub) sub.textContent =
-      "월별 유지·청약·취소/해지 건수와 전월 대비 증감입니다" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + ".";
+      "월별 유지·청약·해지 건수와 전월 대비 증감입니다" + (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + ".";
 
     var byMonth = {};
     records.forEach(function (r) {
@@ -3384,10 +3508,10 @@
     var bestIncTotal = null, bestDecTotal = null;
     months.forEach(function (ym) {
       var b = byMonth[ym];
-      var maintain = b["유지"].count, pending = b["청약"].count, cancel = b["청약취소"].count;
-      var maintainFee = b["유지"].fee, pendingFee = b["청약"].fee, cancelFee = b["청약취소"].fee;
-      var total = maintain + pending + cancel;
-      var totalFee = maintainFee + pendingFee + cancelFee;
+      var maintain = b["유지"].count, pending = b["청약"].count, terminated = b["해지"].count;
+      var maintainFee = b["유지"].fee, pendingFee = b["청약"].fee, terminatedFee = b["해지"].fee;
+      var total = maintain + pending + terminated;
+      var totalFee = maintainFee + pendingFee + terminatedFee;
       var tr = document.createElement("tr");
       tr.appendChild(el("td", null, trendBucketLabel(ym, "month", monthMultiYear)));
       tr.appendChild(el("td", null, fmt(maintain)));
@@ -3396,8 +3520,8 @@
       tr.appendChild(el("td", null, fmt(pending)));
       tr.appendChild(el("td", null, fmtFee(pendingFee)));
       tr.appendChild(buildDeltaCell(pending, prevPending));
-      tr.appendChild(el("td", null, fmt(cancel)));
-      tr.appendChild(el("td", null, fmtFee(cancelFee)));
+      tr.appendChild(el("td", null, fmt(terminated)));
+      tr.appendChild(el("td", null, fmtFee(terminatedFee)));
       tr.appendChild(el("td", null, fmt(total)));
       tr.appendChild(el("td", null, fmtFee(totalFee)));
       tbody.appendChild(tr);
@@ -3423,6 +3547,10 @@
 
   // ---------- year-over-year comparison ----------
   var YOY_COLORS = ["var(--rank-bar)", "var(--cat-2)", "var(--cat-3)"];
+  function bucketValueForStatus(bucket, metric, status) {
+    return status ? bucket[status][metric] : bucketTotal(bucket, metric);
+  }
+
   function renderYoyDeltaBars(byYM, activeYears, metric, els) {
     var svg = els.svg, yAxisEl = els.yAxisEl, hitRow = els.hitRow, axisXEl = els.axisXEl,
       crosshair = els.crosshair, plotEl = els.plotEl, legendEl = els.legendEl;
@@ -3452,8 +3580,8 @@
       var cYm = curY + "-" + (m < 10 ? "0" + m : "" + m);
       var pB = byYM[pYm], cB = byYM[cYm];
       if (!pB) continue;
-      var prevVal = bucketTotal(pB, metric);
-      var curVal = cB ? bucketTotal(cB, metric) : 0;
+      var prevVal = bucketValueForStatus(pB, metric, state.yoyStatus);
+      var curVal = cB ? bucketValueForStatus(cB, metric, state.yoyStatus) : 0;
       if (prevVal === 0) continue;
       var pct = (curVal - prevVal) / prevVal * 100;
       months.push({ m: m, prevVal: prevVal, curVal: curVal, pct: pct, isPartial: curYIsPartial && m === maxMonth });
@@ -3577,7 +3705,8 @@
 
     var indexMode = state.yoyMode === "index";
     var yoyDeltaMode = state.yoyMode === "yoy";
-    var scopeSuffix = (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + ".";
+    var statusLabel = state.yoyStatus ? STATUS_LABEL[state.yoyStatus] : "전체(유지+청약+해지)";
+    var scopeSuffix = (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : "")) + " · " + statusLabel + " 기준.";
     document.getElementById("yoy-sub").textContent = yoyDeltaMode
       ? "같은 달을 전년과 비교해 증감률이 큰 달을 찾습니다(YoY = 전년 동월 대비)" + scopeSuffix
       : indexMode
@@ -3630,7 +3759,7 @@
         if (isFuture) { vals.push(null); continue; }
         var ym = y + "-" + (m < 10 ? "0" + m : "" + m);
         var b = byYM[ym];
-        vals.push(b ? bucketTotal(b, metric) : 0);
+        vals.push(b ? bucketValueForStatus(b, metric, state.yoyStatus) : 0);
       }
       return { year: y, vals: vals, color: YOY_COLORS[idx % YOY_COLORS.length] };
     });
@@ -3774,6 +3903,174 @@
     }
   }
 
+  // 해지(일반해지) 전용 연도별 비교 — 위쪽 "연도별 비교" 차트와 별개로 항상 해지만 보여줍니다.
+  // 연도 선택(state.yoyYears)과 건수/월정료 기준(state.yoyMetric)은 위 차트와 함께 씁니다.
+  function renderYoyTerminatedChart(records) {
+    var svg = document.getElementById("yoy-term-svg");
+    if (!svg) return;
+    var byYM = {};
+    records.forEach(function (r) {
+      var ym = r[3].slice(0, 7);
+      if (!byYM[ym]) byYM[ym] = emptyBucket();
+      addToBucket(byYM[ym], r);
+    });
+
+    var yearsPresent = {};
+    ALL_DATES.forEach(function (d) { yearsPresent[d.slice(0, 4)] = 1; });
+    var years = Object.keys(yearsPresent).sort();
+
+    var yAxisEl = document.getElementById("yoy-term-yaxis");
+    var hitRow = document.getElementById("yoy-term-hitrow");
+    var axisXEl = document.getElementById("yoy-term-axis-x");
+    var crosshair = document.getElementById("yoy-term-crosshair");
+    var plotEl = document.getElementById("yoy-term-plot");
+    var legendEl = document.getElementById("yoy-term-legend");
+    svg.innerHTML = ""; yAxisEl.innerHTML = ""; hitRow.innerHTML = ""; axisXEl.innerHTML = ""; legendEl.innerHTML = "";
+    crosshair.classList.remove("show");
+    var staleMsg = plotEl.querySelector(".yoy-empty-msg");
+    if (staleMsg) staleMsg.remove();
+
+    var scopeSuffix = (state.branch ? " · " + shortBranch(state.branch) + (state.agent ? " · " + state.agent : "") : (state.hq ? " · " + state.hq : ""));
+    document.getElementById("yoy-term-sub").textContent = "같은 달의 해지(일반해지) 건수를 연도별로 겹쳐서 비교합니다" + scopeSuffix + ".";
+
+    if (years.length === 0) {
+      plotEl.appendChild(el("p", "sub mline-empty-msg", "표시할 데이터가 없습니다."));
+      return;
+    }
+
+    if (!state.yoyYears) state.yoyYears = {};
+    years.forEach(function (y) { if (!(y in state.yoyYears)) state.yoyYears[y] = true; });
+    var activeYears = years.filter(function (y) { return state.yoyYears[y]; });
+    var metric = state.yoyMetric;
+
+    if (activeYears.length === 0) {
+      plotEl.appendChild(el("p", "sub mline-empty-msg", "위 '연도별 비교' 차트에서 비교할 연도를 선택하세요."));
+      return;
+    }
+
+    var maxDate = ALL_DATES[ALL_DATES.length - 1];
+    var maxYear = maxDate.slice(0, 4);
+    var maxMonth = Number(maxDate.slice(5, 7));
+    var daysInLastMonthGlobal = new Date(Number(maxYear), maxMonth, 0).getDate();
+    var lastActualDayGlobal = Number(maxDate.slice(8, 10));
+
+    var series = activeYears.map(function (y, idx) {
+      var vals = [];
+      for (var m = 1; m <= 12; m++) {
+        var isFuture = y > maxYear || (y === maxYear && m > maxMonth);
+        if (isFuture) { vals.push(null); continue; }
+        var ym = y + "-" + (m < 10 ? "0" + m : "" + m);
+        var b = byYM[ym];
+        vals.push(b ? b["해지"][metric] : 0);
+      }
+      return { year: y, vals: vals, color: YOY_COLORS[idx % YOY_COLORS.length] };
+    });
+
+    var currentMonthPartial = lastActualDayGlobal < daysInLastMonthGlobal;
+
+    var allVals = [];
+    series.forEach(function (s) { s.vals.forEach(function (v) { if (v !== null) allVals.push(v); }); });
+    var rawMax = allVals.length ? Math.max.apply(null, allVals) : 0;
+    var maxVal = metric === "fee" ? niceMax(rawMax / 1000) * 1000 : niceMax(rawMax);
+    if (maxVal <= 0) maxVal = 1;
+
+    [1, 0.75, 0.5, 0.25, 0].forEach(function (f) {
+      var val = maxVal * f;
+      yAxisEl.appendChild(el("span", null, metric === "fee" ? fmt(Math.round(val / 1000)) + "천" : fmt(Math.round(val))));
+    });
+
+    var colMinW = Math.max(280, 12 * 42) + "px";
+    plotEl.style.minWidth = colMinW;
+    axisXEl.style.minWidth = colMinW;
+
+    var W = plotEl.clientWidth || 600, H = plotEl.clientHeight || 260, padX = 24;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var usableW = W - padX * 2;
+    function xAt(i) { return padX + (i / 11) * usableW; }
+    function yAt(v) { return H - (v / maxVal) * H; }
+
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+      var y = H - f * H;
+      svg.appendChild(svgEl("line", { x1: 0, x2: W, y1: y, y2: y, stroke: "var(--grid-line)", "stroke-width": 1 }));
+    });
+
+    series.forEach(function (s) {
+      var pts = [];
+      s.vals.forEach(function (v, i) { if (v !== null) pts.push(xAt(i) + "," + yAt(v)); });
+      svg.appendChild(svgEl("polyline", {
+        points: pts.join(" "), fill: "none", stroke: s.color, "stroke-width": 3,
+        "stroke-linejoin": "round", "stroke-linecap": "round"
+      }));
+      var lastIdx = -1;
+      s.vals.forEach(function (v, i) {
+        if (v === null) return;
+        lastIdx = i;
+        svg.appendChild(svgEl("circle", { cx: xAt(i), cy: yAt(v), r: 5, fill: s.color, stroke: "var(--surface-1)", "stroke-width": 2 }));
+      });
+      if (lastIdx >= 0) {
+        var text = fmtMetric(s.vals[lastIdx], metric);
+        var lx = xAt(lastIdx);
+        var above = yAt(s.vals[lastIdx]) - 18;
+        var ly = above - 10 < 4 ? yAt(s.vals[lastIdx]) + 22 : above;
+        var estWidth = text.length * 7.8 + 14;
+        svg.appendChild(svgEl("rect", { x: lx - estWidth / 2, y: ly - 11, width: estWidth, height: 21, rx: 4, fill: "var(--surface-1)" }));
+        var t = svgEl("text", { x: lx, y: ly + 4, "text-anchor": "middle", "font-size": 13, "font-weight": 650, fill: s.color });
+        t.textContent = text;
+        svg.appendChild(t);
+      }
+    });
+
+    var _loop = function (m) {
+      var i = m - 1;
+      var hit = el("div", "mline-hit");
+      var ttRows = series.filter(function (s) { return s.vals[i] !== null; }).map(function (s) {
+        return { label: s.year + "년", value: s.vals[i], color: s.color, rawYear: Number(s.year) };
+      });
+      ttRows.sort(function (a, b) { return b.rawYear - a.rawYear; });
+      if (ttRows.length >= 2) {
+        var v1 = ttRows[0].value;
+        var v2 = ttRows[1].value;
+        var gap = v1 - v2;
+        var gapText = (gap > 0 ? "+" : "") + fmtMetric(gap, metric);
+        if (v2 > 0) {
+          var pct = Math.round((gap / v2) * 100);
+          gapText += " (" + (pct > 0 ? "+" : "") + pct + "%)";
+        }
+        var c = gap > 0 ? "var(--critical)" : (gap < 0 ? "var(--good)" : "var(--text-muted)");
+        ttRows.push({ label: ttRows[0].rawYear + " vs " + ttRows[1].rawYear + " (Gap)", value: gapText, metric: "text", color: c });
+      }
+      hit.addEventListener("pointermove", function (evt) {
+        crosshair.style.left = (xAt(i) / W * 100) + "%";
+        crosshair.classList.add("show");
+        showColorTooltip(evt, m + "월", ttRows, metric);
+      });
+      hit.addEventListener("pointerleave", function () { crosshair.classList.remove("show"); hideTooltip(); });
+      hitRow.appendChild(hit);
+      axisXEl.appendChild(el("span", null, m + "월"));
+    };
+    for (var m = 1; m <= 12; m++) _loop(m);
+
+    activeYears.forEach(function (y, idx) {
+      var s = series[idx];
+      var chip = el("div", "quadrant-chip");
+      var sw = document.createElement("i");
+      sw.style.background = s.color;
+      chip.appendChild(sw);
+      var total = s.vals.reduce(function (sum, v) { return sum + (v || 0); }, 0);
+      chip.appendChild(document.createTextNode(y + "년 합계 "));
+      chip.appendChild(el("b", null, fmtMetric(total, metric)));
+      legendEl.appendChild(chip);
+    });
+
+    var noteEl = document.getElementById("yoy-term-note");
+    var maxYearSeriesIdx = activeYears.indexOf(maxYear);
+    if (maxYearSeriesIdx !== -1 && currentMonthPartial) {
+      noteEl.textContent = maxYear + "년 " + maxMonth + "월은 " + lastActualDayGlobal + "일까지의 데이터로, 아직 진행 중인 달입니다(월말까지 집계되면 값이 늘어날 수 있습니다).";
+    } else {
+      noteEl.textContent = "";
+    }
+  }
+
   // ---------- agent table ----------
   function computeAgentRows(records) {
     return aggregateByAgent(records).map(toSummaryRow);
@@ -3803,9 +4100,9 @@
     var tdCancelRate = el("td", cancelClass(r.cancelRate), r.cancelRate.toFixed(1) + "%");
     // Heatmap for cancel rate (red when higher)
     var cp = Math.min(1, r.cancelRate / 30);
-    tdCancelRate.style.background = "rgba(239, 68, 68, " + (cp * 0.25) + ")";
+    tdCancelRate.style.background = "rgba(153, 27, 27, " + (cp * 0.25) + ")";
     tr.appendChild(tdCancelRate);
-    
+
     var tdConv = el("td", perfClass(r.conv), r.conv === null ? "–" : r.conv.toFixed(1) + "%");
     if (r.conv !== null) {
       // Heatmap for conv rate (green when higher)
@@ -3830,7 +4127,7 @@
     var rates = yms.map(function (ym) {
       var b = monthly[ym];
       var tot = bucketTotal(b, "count");
-      return tot > 0 ? (b["청약취소"].count / tot * 100) : 0;
+      return tot > 0 ? (b["해지"].count / tot * 100) : 0;
     });
     var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 90 20");
@@ -4065,7 +4362,7 @@
       ? ((state.dateFrom || ALL_DATES[0]) + " ~ " + (state.dateTo || ALL_DATES[ALL_DATES.length - 1]))
       : (ALL_DATES.length ? (ALL_DATES[0] + " ~ " + ALL_DATES[ALL_DATES.length - 1] + " (전체 기간)") : "데이터 없음");
     document.getElementById("subtitle").textContent = dateLabel + " · " + scope +
-      (state.excludeCancelled ? " · 취소/해지 제외" : "") +
+      (state.excludeCancelled ? " · 해지 제외" : "") +
       (state.excludePlaceholder ? " · \"" + PLACEHOLDER_AGENT + "\" 제외" : "");
   }
 
@@ -4127,7 +4424,7 @@
     var pre = branches.map(function(b) {
       var c = b.conv;
       if (c === undefined && b.bucket) {
-         var d = b.bucket["유지"].count + b.bucket["청약취소"].count;
+         var d = b.bucket["유지"].count + b.bucket["해지"].count;
          c = d > 0 ? (b.bucket["유지"].count / d * 100) : 50;
       }
       return { branch: b.branch, count: b.count || b.total || 0, fee: b.fee || 0, conv: c || 50 };
@@ -4285,9 +4582,9 @@
       return;
     }
     
-    var vars = ["총건수", "총월정료", "유지건수", "취소율"];
+    var vars = ["총건수", "총월정료", "유지건수", "해지율"];
     var dataMatrix = branches.map(function(b) {
-      var cancelRate = b.bucket["청약취소"].count / b.count * 100;
+      var cancelRate = b.bucket["해지"].count / b.count * 100;
       return [b.count, b.fee, b.bucket["유지"].count, cancelRate];
     });
     
@@ -4378,6 +4675,7 @@
     renderMonthlyTrendCharts(full);
     renderMonthlyAnalysis(full);
     renderYoyChart(branchAgentRecords());
+    renderYoyTerminatedChart(branchAgentRecords());
     renderTable(bdRecs);
     renderClusters(bdRecs);
     if(window.renderParetoChart) window.renderParetoChart(bdRecs);

@@ -67,7 +67,7 @@ DATA_PLACEHOLDER = "__DASHBOARD_DATA_JSON__"
 REQUIRED_COLS = ["영업지사명", "영업자명", "영업자소속", "청약일자", "계약상태(중)", "계약번호", "상호", "KTT월정료"]
 OPTIONAL_REFERRER_COL = "추천자명"
 
-STATUS_LABELS = {"유지": "유지", "청약": "청약(진행)", "청약취소": "취소/해지"}
+STATUS_LABELS = {"유지": "유지", "청약": "청약(진행)", "청약취소": "취소(1번 파일)", "해지": "해지(일반해지)"}
 
 
 # ---------------------------------------------------------------------------
@@ -86,9 +86,14 @@ def normalize_date(raw):
 
 
 def classify_status(raw):
+    """1번 파일(메인 CSV)의 취소/해지류(청약취소·명변해지·전출해지 등)는
+    해지(일반해지, 2번 파일)와 별개이며 대시보드 전체에서 제외합니다.
+    해당 상태는 None을 반환하니 호출부에서 건너뛰어야 합니다."""
     s = (raw or "").strip()
+    if s == "일반해지":
+        return "해지"
     if "취소" in s or "해지" in s:
-        return "청약취소"
+        return None
     if s == "유지" or s == "명변유지":
         return "유지"
     return "청약"
@@ -116,10 +121,11 @@ def _set_max_csv_field_size():
 _set_max_csv_field_size()
 
 
-def _parse_with_encoding(path, encoding):
+def _parse_with_encoding(path, encoding, exclude_raw_status=None):
     records = []
     skipped = 0
     status_counts = {}
+    exclude_raw_status = exclude_raw_status or frozenset()
 
     with open(path, encoding=encoding, newline="") as f:
         reader = csv.reader(f)
@@ -155,15 +161,25 @@ def _parse_with_encoding(path, encoding):
                 continue
 
             raw_status = row[i_status] if i_status < len(row) else ""
+            if raw_status in exclude_raw_status:
+                skipped += 1
+                continue
             status_counts[raw_status] = status_counts.get(raw_status, 0) + 1
             status = classify_status(raw_status)
+            if status is None:
+                # 1번 파일의 취소/해지류(청약취소·명변해지·전출해지 등)는 해지와
+                # 별개이며 대시보드 전체에서 제외합니다.
+                skipped += 1
+                continue
 
             fee_raw = re.sub(r"[^0-9-]", "", (row[i_fee] if i_fee < len(row) else "0") or "0")
             try:
                 fee = int(fee_raw) if fee_raw not in ("", "-") else 0
             except ValueError:
                 fee = 0
-            
+
+            # 월정료 0원/빈칸은 상태에 관계없이 제외합니다(엑셀 직접 검증 결과와
+            # 일치하는 기준입니다).
             if fee == 0:
                 skipped += 1
                 continue
@@ -188,12 +204,12 @@ def _parse_with_encoding(path, encoding):
     return records, skipped, status_counts
 
 
-def read_csv_records(path):
+def read_csv_records(path, exclude_raw_status=None):
     """UTF-8(BOM 포함) 우선 시도 후, 실패하면 CP949(EUC-KR)로 재시도합니다."""
     last_error = None
     for encoding in ("utf-8-sig", "cp949"):
         try:
-            records, skipped, status_counts = _parse_with_encoding(path, encoding)
+            records, skipped, status_counts = _parse_with_encoding(path, encoding, exclude_raw_status)
             return records, skipped, status_counts, encoding
         except UnicodeDecodeError as e:
             last_error = e
@@ -201,6 +217,128 @@ def read_csv_records(path):
     raise CsvFormatError(
         "CSV 파일의 인코딩을 인식할 수 없습니다 (UTF-8 / CP949 모두 실패). "
         "원본 프로그램에서 CSV로 다시 내보내 주세요."
+    ) from last_error
+
+
+TERM_REQUIRED_COLS = ["영업지사명", "영업자명", "영업자소속", "해지일자", "계약상태(중)", "계약번호", "상호", "KTT월정료"]
+
+
+def _parse_termination_with_encoding(path, encoding):
+    """해지 전용 CSV(전사 해지 export 등 넓은 스키마)에서 계약상태(중)이
+    '일반해지'인 행만 추려 표준 레코드로 변환합니다.
+    - '전출해지'는 제외합니다(단순 관리 이관이라 실질적 해지가 아님).
+    - 같은 계약번호가 여러 번 나올 수 있는데(중복 스냅샷), 메인 CSV(1번 파일)도
+      행 단위로 그대로 세는 것과 동일하게 여기서도 행을 그대로 각각 셉니다
+      (건수를 원본 파일 기준과 맞추기 위함). KTT월정료가 빈 사본은 0원으로
+      들어가므로 합계에는 영향이 없습니다.
+    - 날짜는 청약일자가 아니라 해지일자를 사용해, 실제 해지가 발생한 시점
+      기준으로 추이를 볼 수 있게 합니다.
+    - 영업지사명/영업본부명이 비어 있으면 관리지사명/관리본부명으로 대체합니다.
+    """
+    records = []
+    skipped = 0
+    excluded_transfer = 0
+
+    with open(path, encoding=encoding, newline="") as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            raise CsvFormatError("해지 전용 CSV 파일에 데이터가 없습니다.")
+
+        missing = [c for c in TERM_REQUIRED_COLS if c not in header]
+        if missing:
+            raise CsvFormatError("해지 전용 CSV 파일에 필수 컬럼이 없습니다: " + ", ".join(missing))
+
+        idx = {c: header.index(c) for c in TERM_REQUIRED_COLS}
+
+        def opt_idx(name):
+            return header.index(name) if name in header else -1
+
+        i_mgmt_branch = opt_idx("관리지사명")
+        i_biz_hq = opt_idx("영업본부명")
+        i_mgmt_hq = opt_idx("관리본부명")
+        ref_idx = opt_idx(OPTIONAL_REFERRER_COL)
+
+        i_branch, i_agent, i_aff = idx["영업지사명"], idx["영업자명"], idx["영업자소속"]
+        i_cancel_date, i_status = idx["해지일자"], idx["계약상태(중)"]
+        i_contract, i_company, i_fee = idx["계약번호"], idx["상호"], idx["KTT월정료"]
+
+        for row in reader:
+            if len(row) < 2:
+                skipped += 1
+                continue
+
+            status = row[i_status] if i_status < len(row) else ""
+            if status == "전출해지":
+                excluded_transfer += 1
+                continue
+            if status != "일반해지":
+                continue  # 해지 전용 파일에서는 일반해지만 취급합니다.
+
+            contract_id = (row[i_contract] if i_contract < len(row) else "").strip()
+
+            date = normalize_date(row[i_cancel_date] if i_cancel_date < len(row) else "")
+            if not date:
+                skipped += 1
+                continue
+
+            fee_raw = re.sub(r"[^0-9-]", "", (row[i_fee] if i_fee < len(row) else "0") or "0")
+            try:
+                fee = int(fee_raw) if fee_raw not in ("", "-") else 0
+            except ValueError:
+                fee = 0
+            # KTT월정료가 0원/빈칸인 행은 제외합니다(엑셀로 직접 검증: 2026년 8월
+            # 강북/강원본부 기준 원본 607건 중 82건이 0원이었고, 이를 제외한
+            # 525건 · 23,340,013원이 실제 정답과 일치했습니다).
+            if fee == 0:
+                skipped += 1
+                continue
+
+            # 관리지사명/관리본부명을 우선합니다: 영업지사명/영업본부명은 "본사",
+            # "OO법인영업팀", "OOSI영업팀" 같은 비지역 영업채널명이 27%가량 섞여
+            # 있어 지역별 집계 기준으로 쓰면 안 됩니다(관리 조직은 항상 채워져
+            # 있고 실제 서비스 지역을 나타냅니다).
+            branch = (row[i_mgmt_branch] if 0 <= i_mgmt_branch < len(row) else "").strip()
+            if not branch and i_branch < len(row):
+                branch = row[i_branch].strip()
+
+            hq_val = (row[i_mgmt_hq] if 0 <= i_mgmt_hq < len(row) else "").strip()
+            if not hq_val and 0 <= i_biz_hq < len(row):
+                hq_val = row[i_biz_hq].strip()
+            if hq_val == "강원본부":
+                hq_val = "강북/강원본부"
+            elif hq_val == "서부본부":
+                hq_val = "강남/서부본부"
+
+            records.append([
+                branch,
+                (row[i_agent] if i_agent < len(row) else "").strip(),
+                (row[i_aff] if i_aff < len(row) else "").strip(),
+                date,
+                classify_status("일반해지"),
+                contract_id,
+                (row[i_company] if i_company < len(row) else "").strip(),
+                fee,
+                (row[ref_idx] if 0 <= ref_idx < len(row) else "").strip(),
+                hq_val,
+            ])
+
+    return records, skipped, excluded_transfer
+
+
+def read_termination_csv_records(path):
+    """UTF-8(BOM 포함) 우선 시도 후, 실패하면 CP949(EUC-KR)로 재시도합니다."""
+    last_error = None
+    for encoding in ("utf-8-sig", "cp949"):
+        try:
+            records, skipped, excluded_transfer = _parse_termination_with_encoding(path, encoding)
+            return records, skipped, excluded_transfer, encoding
+        except UnicodeDecodeError as e:
+            last_error = e
+            continue
+    raise CsvFormatError(
+        "해지 전용 CSV 파일의 인코딩을 인식할 수 없습니다 (UTF-8 / CP949 모두 실패)."
     ) from last_error
 
 
@@ -220,7 +358,8 @@ def build_summary(records, skipped, status_counts, encoding):
         lines.append("상태값 원본 분포:")
         for raw, cnt in sorted(status_counts.items(), key=lambda kv: -kv[1]):
             bucket = classify_status(raw)
-            lines.append("  · {0!r} → {1} : {2:,}건".format(raw, STATUS_LABELS[bucket], cnt))
+            label = STATUS_LABELS[bucket] if bucket else "제외됨(1번 파일 취소/해지류)"
+            lines.append("  · {0!r} → {1} : {2:,}건".format(raw, label, cnt))
     return "\n".join(lines)
 
 
@@ -277,12 +416,13 @@ class DashboardApp:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE + " v" + APP_VERSION)
-        self.root.geometry("820x680")
-        self.root.minsize(700, 560)
+        self.root.geometry("820x760")
+        self.root.minsize(700, 620)
         self.root.configure(bg=COLOR_BG)
 
         self.cfg = load_config()
         self.input_var = tk.StringVar(value=self.cfg.get("last_input", ""))
+        self.term_input_var = tk.StringVar(value=self.cfg.get("last_term_input", ""))
         self.output_var = tk.StringVar(value=self.cfg.get("last_output", ""))
         self.open_after_var = tk.BooleanVar(value=self.cfg.get("open_after", True))
         self.status_var = tk.StringVar(value="준비됨")
@@ -413,9 +553,25 @@ class DashboardApp:
         ttk.Entry(row1, textvariable=self.input_var).pack(side="left", fill="x", expand=True, ipady=2)
         ttk.Button(row1, text="찾아보기...", command=self.pick_input).pack(side="left", padx=(8, 0))
 
+        # 해지 전용 CSV 파일 (선택 - 있으면 자동 병합)
+        term_frame = ttk.LabelFrame(self.root)
+        term_frame.configure(labelwidget=self._section_label(term_frame, 2, "해지 전용 CSV 파일 (선택 · 있으면 자동 병합)"))
+        term_frame.pack(fill="x", **pad)
+        row_term = ttk.Frame(term_frame)
+        row_term.pack(fill="x", padx=12, pady=(12, 4))
+        ttk.Entry(row_term, textvariable=self.term_input_var).pack(side="left", fill="x", expand=True, ipady=2)
+        ttk.Button(row_term, text="찾아보기...", command=self.pick_term_input).pack(side="left", padx=(8, 0))
+        ttk.Button(row_term, text="지우기", command=lambda: self.term_input_var.set("")).pack(side="left", padx=(6, 0))
+        ttk.Label(
+            term_frame,
+            text="계약상태(중)이 '일반해지'인 행만 반영됩니다(전출해지 제외). 실적 CSV에 이미 있는 동일 계약(일반해지)은\n"
+                 "자동으로 이 파일 값으로 대체되어 중복 집계되지 않으며, 날짜는 청약일자 대신 해지일자를 사용합니다.",
+            style="Sub.TLabel", justify="left",
+        ).pack(anchor="w", padx=12, pady=(0, 12))
+
         # 출력 파일
         out_frame = ttk.LabelFrame(self.root)
-        out_frame.configure(labelwidget=self._section_label(out_frame, 2, "생성할 대시보드 HTML"))
+        out_frame.configure(labelwidget=self._section_label(out_frame, 3, "생성할 대시보드 HTML"))
         out_frame.pack(fill="x", **pad)
         row2 = ttk.Frame(out_frame)
         row2.pack(fill="x", padx=12, pady=12)
@@ -450,7 +606,7 @@ class DashboardApp:
 
         # 로그
         log_frame = ttk.LabelFrame(self.root)
-        log_frame.configure(labelwidget=self._section_label(log_frame, 3, "처리 로그"))
+        log_frame.configure(labelwidget=self._section_label(log_frame, 4, "처리 로그"))
         log_frame.pack(fill="both", expand=True, padx=16, pady=(6, 10))
         log_inner = tk.Frame(
             log_frame, bg=COLOR_CARD, highlightthickness=1, highlightbackground=COLOR_BORDER,
@@ -498,6 +654,16 @@ class DashboardApp:
         if not self.output_var.get():
             self._suggest_output(path)
 
+    def pick_term_input(self):
+        initial_dir = os.path.dirname(self.term_input_var.get()) if self.term_input_var.get() else BASE_DIR
+        path = filedialog.askopenfilename(
+            title="해지 전용 CSV 파일 선택",
+            initialdir=initial_dir if os.path.isdir(initial_dir) else BASE_DIR,
+            filetypes=[("CSV 파일", "*.csv"), ("모든 파일", "*.*")],
+        )
+        if path:
+            self.term_input_var.set(path)
+
     def _suggest_output(self, input_path):
         folder = os.path.dirname(input_path) or BASE_DIR
         stamp = datetime.now().strftime("%Y%m%d")
@@ -523,6 +689,7 @@ class DashboardApp:
             return
 
         input_path = self.input_var.get().strip()
+        term_input_path = self.term_input_var.get().strip()
         output_path = self.output_var.get().strip()
 
         if not input_path:
@@ -530,6 +697,9 @@ class DashboardApp:
             return
         if not os.path.isfile(input_path):
             messagebox.showerror(APP_TITLE, "선택한 CSV 파일을 찾을 수 없습니다:\n" + input_path)
+            return
+        if term_input_path and not os.path.isfile(term_input_path):
+            messagebox.showerror(APP_TITLE, "선택한 해지 전용 CSV 파일을 찾을 수 없습니다:\n" + term_input_path)
             return
         if not output_path:
             self._suggest_output(input_path)
@@ -545,14 +715,30 @@ class DashboardApp:
         self.progress.start(12)
 
         self._worker = threading.Thread(
-            target=self._run_pipeline, args=(input_path, output_path), daemon=True
+            target=self._run_pipeline, args=(input_path, output_path, term_input_path), daemon=True
         )
         self._worker.start()
 
-    def _run_pipeline(self, input_path, output_path):
+    def _run_pipeline(self, input_path, output_path, term_input_path=""):
         try:
             self._post(lambda: self._log("CSV 읽는 중: " + input_path))
-            records, skipped, status_counts, encoding = read_csv_records(input_path)
+            exclude_status = {"일반해지"} if term_input_path else None
+            records, skipped, status_counts, encoding = read_csv_records(input_path, exclude_status)
+
+            if term_input_path:
+                self._post(lambda: self._log(
+                    "해지 전용 파일과 병합하므로 실적 CSV의 '일반해지' 행은 건너뛰고 해지 전용 파일 값을 사용합니다."
+                ))
+                self._post(lambda: self._log("해지 전용 CSV 읽는 중: " + term_input_path))
+                term_records, term_skipped, term_excluded_transfer, term_encoding = \
+                    read_termination_csv_records(term_input_path)
+                records = records + term_records
+                self._post(lambda: self._log(
+                    "해지 전용 파일: 일반해지 {0:,}건 반영(인코딩 {1}) · 전출해지 {2:,}건 제외 · "
+                    "형식 오류로 건너뜀 {3:,}건".format(
+                        len(term_records), term_encoding, term_excluded_transfer, term_skipped
+                    )
+                ))
 
             if not records:
                 raise CsvFormatError("유효한 데이터 행을 찾지 못했습니다.")
@@ -566,6 +752,7 @@ class DashboardApp:
             self._post(lambda: self._log("완료: {0:,} bytes ({1:.1f} MB)".format(size_bytes, size_mb)))
 
             self.cfg["last_input"] = input_path
+            self.cfg["last_term_input"] = term_input_path
             self.cfg["last_output"] = output_path
             self.cfg["open_after"] = self.open_after_var.get()
             save_config(self.cfg)
